@@ -1109,6 +1109,15 @@ select[multiple].prop-input:hover {
     border: 1px solid #c3e6cb;
 }
 
+.model-pricing {
+    display: inline-block;
+    font-size: 0.7em;
+    color: #999;
+    margin-left: 8px;
+    font-weight: normal;
+}
+
+
 /* ⚠️ 本番環境では削除: デバッグ関連スタイル */
 
 /* デバッグメニューアイテム */

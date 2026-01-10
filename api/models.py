@@ -221,12 +221,8 @@ def select_model_for_input(
         # フォールバック候補リスト（優先順）
         FALLBACK_VISION_MODELS = [
             DEFAULT_MULTIMODAL_MODEL,
-            "gemini/gemini-2.0-flash-exp",
-            "gemini/gemini-1.5-flash",
-            "gemini/gemini-1.5-pro",
-            "openai/gpt-4o-mini",
-            "openai/gpt-4o",
-            "anthropic/claude-3-5-sonnet-20241022"
+            "gemini/gemini-2.5-flash",
+            "openai/gpt-4o-mini"
         ]
         
         vision_models = get_models_by_capability(supports_vision=True)
@@ -252,11 +248,8 @@ def select_model_for_input(
         # フォールバック候補リスト（安定性の高いモデル順）
         FALLBACK_TEXT_MODELS = [
             DEFAULT_TEXT_MODEL,
-            "gemini/gemini-2.0-flash-exp",
-            "gemini/gemini-1.5-flash",
-            "gemini/gemini-1.5-pro",
-            "openai/gpt-4o-mini",
-            "anthropic/claude-3-5-haiku-20241022"
+            "gemini/gemini-2.5-flash",
+            "openai/gpt-4o-mini"
         ]
         
         # 1. フォールバックリスト順に試行

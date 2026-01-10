@@ -54,6 +54,9 @@ let defaultMultimodalModel = null; // デフォルトの画像対応モデル
 let currentModel = null;          // 現在ユーザーが選択しているモデル（nullなら自動選択）
 let tempSelectedModel = null;     // 設定モーダルでの一時選択状態
 let sessionCost = 0.0;            // 現在のセッションでの推定コスト合計
+
+// --- デバッグモード (Debug Mode) ---
+let serverDebugMode = false;      // サーバーのDEBUG_MODE状態（/api/configから取得）
 let showModelInfo = true;         // チャットバブルにモデル情報を表示するかどうか
 
 document.addEventListener('DOMContentLoaded', () => {
@@ -326,6 +329,9 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeDebugModalBtn) closeDebugModalBtn.addEventListener('click', closeDebugModal);
     if (closeDebugBtn) closeDebugBtn.addEventListener('click', closeDebugModal);
     if (refreshDebugBtn) refreshDebugBtn.addEventListener('click', loadDebugInfo);
+    
+    // DEBUG_MODE状態を取得してUI制御
+    initializeDebugMode();
 });
 
 // ⚠️ 本番環境では削除: デバッグモーダル関連関数
@@ -469,6 +475,64 @@ function renderDebugInfo(data) {
     html += '</div></div>';
     
     content.innerHTML = html;
+}
+
+/**
+ * DEBUG_MODE状態を取得してUI制御を初期化
+ */
+async function initializeDebugMode() {
+    try {
+        const res = await fetch('/api/config');
+        if (!res.ok) {
+            console.warn('[DEBUG_MODE] Failed to fetch config, assuming debug_mode=false');
+            return;
+        }
+        
+        const data = await res.json();
+        serverDebugMode = data.debug_mode || false;
+        
+        debugLog('[DEBUG_MODE] Server debug_mode:', serverDebugMode);
+        
+        // UI要素の表示制御
+        updateDebugModeUI();
+        
+    } catch (err) {
+        console.error('[DEBUG_MODE] Error fetching config:', err);
+        serverDebugMode = false;
+        updateDebugModeUI();
+    }
+}
+
+/**
+ * DEBUG_MODE状態に応じてUI要素の表示を制御
+ */
+function updateDebugModeUI() {
+    // モデル選択メニューの表示制御
+    const modelSelectMenuItem = document.getElementById('modelSelectMenuItem');
+    if (modelSelectMenuItem) {
+        if (serverDebugMode) {
+            // DEBUG_MODE有効: モデル選択を表示
+            modelSelectMenuItem.style.display = '';
+        } else {
+            // DEBUG_MODE無効: モデル選択を非表示
+            modelSelectMenuItem.style.display = 'none';
+            // 現在のモデル選択をクリア（自動選択に戻す）
+            currentModel = null;
+            localStorage.removeItem('memo_ai_selected_model');
+        }
+    }
+    
+    // デバッグメニューの表示制御
+    const debugInfoItem = document.getElementById('debugInfoMenuItem');
+    if (debugInfoItem) {
+        if (serverDebugMode) {
+            debugInfoItem.style.display = '';
+        } else {
+            debugInfoItem.style.display = 'none';
+        }
+    }
+    
+    debugLog('[DEBUG_MODE] UI updated. Model selection:', serverDebugMode ? 'enabled' : 'disabled');
 }
 
 // ⚠️ ここまで削除（本番環境では）
@@ -1963,20 +2027,11 @@ function openContentModal() {
         return;
     }
     
-    const modal = document.getElementById('contentModal');
+    // 内蔵ビューワーではなく、ブラウザでNotionページを直接開く
+    const notionUrl = `https://www.notion.so/${currentTargetId.replace(/-/g, '')}`;
+    window.open(notionUrl, '_blank');
     
-    // タイトルをNotionリンクに変更
-    // タイトルをクリックすると実際のNotionページが開くようにUXを改善しています。
-    const titleEl = document.getElementById('contentModalTitle');
-    if (titleEl && currentTargetId) {
-        const notionUrl = `https://www.notion.so/${currentTargetId.replace(/-/g, '')}`;
-        titleEl.innerHTML = `<a href="${notionUrl}" target="_blank" style="text-decoration: none; color: inherit; display: flex; align-items: center; gap: 8px;">📄 ${currentTargetName} <span style="font-size: 0.8em; opacity: 0.7;">🔗</span></a>`;
-    }
-
-    if (modal) modal.classList.remove('hidden');
-    
-    // コンテンツを読み込んで表示
-    fetchAndDisplayContentInModal(currentTargetId, currentTargetType);
+    showToast('Notionページを開きました');
 }
 
 function closeContentModal() {
@@ -2040,6 +2095,15 @@ async function loadAvailableModels() {
         defaultTextModel = data.defaults?.text;
         defaultMultimodalModel = data.defaults?.multimodal;
         
+        // デフォルトモデルの警告チェック
+        if (data.warnings && data.warnings.length > 0) {
+            data.warnings.forEach(warning => {
+                console.warn(`[MODEL WARNING] ${warning.message}`);
+                // UIに警告トーストを表示
+                showToast(warning.message);
+            });
+        }
+        
         // ユーザーの前回の選択を復元（なければ自動選択）
         currentModel = localStorage.getItem('memo_ai_selected_model') || null;
         
@@ -2085,6 +2149,10 @@ function renderModelList() {
     const visionDisplay = visionModelInfo 
         ? `[${visionModelInfo.provider}] ${visionModelInfo.name}`
         : (defaultMultimodalModel || 'Unknown');
+    
+    // デフォルトモデル利用不可の警告
+    const textWarning = !textModelInfo ? ' ⚠️' : '';
+    const visionWarning = !visionModelInfo ? ' ⚠️' : '';
 
     // 自動選択オプション (推奨)
     const autoItem = document.createElement('div');
@@ -2094,8 +2162,8 @@ function renderModelList() {
         <div class="model-info">
             <div class="model-name">✨ 自動選択 (推奨)</div>
             <div class="model-provider" style="display: flex; flex-direction: column; gap: 4px; margin-top: 4px;">
-                <div style="font-size: 0.9em;">📝 テキスト: <span style="font-weight: 500;">${textDisplay}</span></div>
-                <div style="font-size: 0.9em;">🖼️ 画像: <span style="font-weight: 500;">${visionDisplay}</span></div>
+                <div style="font-size: 0.9em;">📝 テキスト: <span style="font-weight: 500;">${textDisplay}${textWarning}</span></div>
+                <div style="font-size: 0.9em;">🖼️ 画像: <span style="font-weight: 500;">${visionDisplay}${visionWarning}</span></div>
             </div>
         </div>
         <span class="model-check">${tempSelectedModel === null ? '✓' : ''}</span>
@@ -2132,10 +2200,26 @@ function createModelItem(model) {
     const rateLimitBadge = model.rate_limit_note 
         ? `<div class="model-badge warning">⚠️ ${model.rate_limit_note}</div>` 
         : '';
+    
+    // トークン単価表示（データがある場合のみ）
+    let pricingText = '';
+    if (model.cost_per_1k_tokens) {
+        const inputCost = model.cost_per_1k_tokens.input;
+        const outputCost = model.cost_per_1k_tokens.output;
+        
+        // コストデータがある場合（0でない場合）
+        if (inputCost > 0 || outputCost > 0) {
+            // 100万トークンあたりの価格に変換（1kトークンの価格 × 1000）
+            const inputCostPer1M = (inputCost * 1000).toFixed(2);
+            const outputCostPer1M = (outputCost * 1000).toFixed(2);
+            
+            pricingText = `<span class="model-pricing">$${inputCostPer1M}/$${outputCostPer1M}</span>`;
+        }
+    }
         
     item.innerHTML = `
         <div class="model-info">
-            <div class="model-name">${displayName}</div>
+            <div class="model-name">${displayName}${pricingText}</div>
             ${rateLimitBadge}
         </div>
         <span class="model-check">${isSelected ? '✓' : ''}</span>

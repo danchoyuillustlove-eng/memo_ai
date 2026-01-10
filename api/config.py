@@ -39,10 +39,24 @@ VERTEX_AI_LOCATION = os.getenv("VERTEX_AI_LOCATION", "us-central1")
 # 環境変数でオーバーライド可能です。
 
 # テキストのみの場合のデフォルト（高速・安価なモデルを推奨）
-DEFAULT_TEXT_MODEL = os.getenv("DEFAULT_TEXT_MODEL", "gemini/gemini-2.0-flash-exp")
+DEFAULT_TEXT_MODEL = os.getenv("DEFAULT_TEXT_MODEL", "gemini/gemini-2.5-flash")
 
 # 画像を含むマルチモーダル入力の場合のデフォルト（Vision対応モデル必須）
-DEFAULT_MULTIMODAL_MODEL = os.getenv("DEFAULT_MULTIMODAL_MODEL", "gemini/gemini-2.0-flash-exp")
+DEFAULT_MULTIMODAL_MODEL = os.getenv("DEFAULT_MULTIMODAL_MODEL", "gemini/gemini-2.5-flash")
+
+# --- 環境変数の検証 (Environment Variable Validation) ---
+def _validate_env_var(var_name: str, var_value: str) -> None:
+    """環境変数の値が正しい形式かチェック"""
+    if not var_value:
+        return
+    
+    # スペースチェック
+    if var_value != var_value.strip():
+        print(f"⚠️  [{var_name}] 不要なスペースあり → .envで '{var_name}={var_value.strip()}' に修正してください")
+
+# デフォルトモデルの検証
+_validate_env_var("DEFAULT_TEXT_MODEL", DEFAULT_TEXT_MODEL)
+_validate_env_var("DEFAULT_MULTIMODAL_MODEL", DEFAULT_MULTIMODAL_MODEL)
 
 # --- LiteLLM設定 (LiteLLM Settings) ---
 # LLM呼び出しライブラリ `litellm` の動作設定
