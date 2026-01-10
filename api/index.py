@@ -296,8 +296,9 @@ async def debug_info():
                 try:
                     contents = os.listdir(full_path)
                     info["contents"] = contents[:10]  # 最初の10個のみ
-                except:
-                    pass
+                except (PermissionError, FileNotFoundError, OSError) as e:
+                    # ディレクトリの読み取り権限がない場合やファイルシステムエラーを想定
+                    info["error"] = f"読み取りエラー: {type(e).__name__}"
         
         filesystem_checks[path] = info
     

@@ -238,7 +238,9 @@ def validate_and_fix_json(json_str: str, schema: Dict[str, Any]) -> Dict[str, An
              try:
                  if v is not None:
                      validated[k] = {"number": float(v)}
-             except:
+             except (ValueError, TypeError):
+                 # 数値変換に失敗した場合はスキップ
+                 # 例: "abc" -> float() は ValueError
                  pass
                  
         elif target_type == "title":

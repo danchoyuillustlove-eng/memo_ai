@@ -1,4 +1,15 @@
 
+// --- デバッグモード設定 (Debug Mode) ---
+// 本番環境では false に設定してください
+const DEBUG_MODE = true;
+
+// デバッグログ用ヘルパー関数
+function debugLog(...args) {
+    if (DEBUG_MODE) {
+        console.log(...args);
+    }
+}
+
 // --- キャッシュ設定 (Cache Settings) ---
 // リクエスト数を削減し、レスポンス速度を向上させるためにブラウザの localStorage を利用します。
 const CACHE_TTL = 180000; // 3分 (ミリ秒): キャッシュの有効期限
