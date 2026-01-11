@@ -24,7 +24,8 @@ const REFERENCE_PAGE_KEY = 'memo_ai_reference_page'; // 「ページを参照」
 
 // デフォルトのシステムプロンプト
 // AIの基本的な役割定義。ターゲットごとに上書き可能です。
-const DEFAULT_SYSTEM_PROMPT = `優秀な秘書として、ユーザーのタスクを明確にする手伝いをすること。
+// Note: バックエンドの /api/config から取得します（api/config.py で一元管理）
+let DEFAULT_SYSTEM_PROMPT = `優秀な秘書として、ユーザーのタスクを明確にする手伝いをすること。
 明確な実行できる タスク名に言い換えて。先頭に的確な絵文字を追加して
 画像の場合は、そこから何をしようとしているのか推定して、タスクにして。
 会話的な返答はしない。
@@ -490,6 +491,12 @@ async function initializeDebugMode() {
         
         const data = await res.json();
         serverDebugMode = data.debug_mode || false;
+        
+        // デフォルトシステムプロンプトを更新
+        if (data.default_system_prompt) {
+            DEFAULT_SYSTEM_PROMPT = data.default_system_prompt;
+            debugLog('[CONFIG] DEFAULT_SYSTEM_PROMPT loaded from backend');
+        }
         
         debugLog('[DEBUG_MODE] Server debug_mode:', serverDebugMode);
         

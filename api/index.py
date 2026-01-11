@@ -28,7 +28,7 @@ from api.ai import analyze_text_with_ai, chat_analyze_text_with_ai
 # 使用可能なAIモデル定義
 from api.models import get_available_models, get_text_models, get_vision_models
 # アプリケーションのデフォルト設定
-from api.config import DEFAULT_TEXT_MODEL, DEFAULT_MULTIMODAL_MODEL
+from api.config import DEFAULT_TEXT_MODEL, DEFAULT_MULTIMODAL_MODEL, DEFAULT_SYSTEM_PROMPT
 # レート制限
 from api.rate_limiter import rate_limiter
 
@@ -403,14 +403,16 @@ async def get_config():
         # 設定DBがない場合でもdebug_modeは返す
         return {
             "configs": [],
-            "debug_mode": debug_mode
+            "debug_mode": debug_mode,
+            "default_system_prompt": DEFAULT_SYSTEM_PROMPT
         }
     
     configs = await fetch_config_db(config_db_id)
     
     return {
         "configs": configs,
-        "debug_mode": debug_mode
+        "debug_mode": debug_mode,
+        "default_system_prompt": DEFAULT_SYSTEM_PROMPT
     }
 
 @app.get("/api/models")
@@ -736,13 +738,8 @@ async def chat_endpoint(request: Request, chat_req: ChatRequest):
         system_prompt = chat_req.system_prompt
         if not system_prompt:
              # デフォルトのペルソナ（秘書）設定
-             # Note: このプロンプトは public/script.js の DEFAULT_SYSTEM_PROMPT と同じ内容です
-             system_prompt = """優秀な秘書として、ユーザーのタスクを明確にする手伝いをすること。
-明確な実行できる タスク名に言い換えて。先頭に的確な絵文字を追加して
-画像の場合は、そこから何をしようとしているのか推定して、タスクにして。
-会話的な返答はしない。
-返答は機械的に、タスク名としてふさわしい文字列のみを出力すること。
-"""
+             # Note: api.config.DEFAULT_SYSTEM_PROMPT から取得（フロントエンドと共通）
+             system_prompt = DEFAULT_SYSTEM_PROMPT
         
         # 日時コンテキストの注入
         current_time_str = get_current_jst_str()
