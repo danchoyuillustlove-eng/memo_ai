@@ -25,11 +25,7 @@ const REFERENCE_PAGE_KEY = 'memo_ai_reference_page'; // 「ページを参照」
 // デフォルトのシステムプロンプト
 // AIの基本的な役割定義。ターゲットごとに上書き可能です。
 // Note: バックエンドの /api/config から取得します（api/config.py で一元管理）
-let DEFAULT_SYSTEM_PROMPT = `優秀な秘書として、ユーザーのタスクを明確にする手伝いをすること。
-明確な実行できる タスク名に言い換えて。先頭に的確な絵文字を追加して
-画像の場合は、そこから何をしようとしているのか推定して、タスクにして。
-会話的な返答はしない。
-返答は機械的に、タスク名としてふさわしい文字列のみを出力すること。`;
+let DEFAULT_SYSTEM_PROMPT = "";
 
 // --- グローバル状態管理 (Global State) ---
 let chatHistory = [];  // UI表示用の全チャット履歴: [{type, message, properties, timestamp}]
@@ -1869,8 +1865,24 @@ function openPromptModal() {
     modal.classList.remove('hidden');
 }
 
-function closePromptModal() {
+function closePromptModal(force = false) {
     const modal = document.getElementById('promptModal');
+    const textarea = document.getElementById('promptTextarea');
+    
+    // 未保存の変更があるかチェック
+    if (force !== true && textarea && !modal.classList.contains('hidden')) {
+        const currentVal = textarea.value;
+        const savedVal = currentSystemPrompt || DEFAULT_SYSTEM_PROMPT;
+        
+        // 変更があり、かつ保存されていない場合
+        if (currentVal !== savedVal) {
+            const confirmMsg = "変更が保存されていません。破棄して閉じますか？";
+            if (!confirm(confirmMsg)) {
+                return; // 閉じるのをキャンセル
+            }
+        }
+    }
+    
     modal.classList.add('hidden');
 }
 
