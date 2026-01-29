@@ -90,7 +90,42 @@ document.addEventListener('DOMContentLoaded', () => {
                 mediaMenu.classList.add('hidden');
             }
         });
+    }
+    
+    // --- 絵文字パレット UI (Emoji Palette) ---
+    const emojiBtn = document.getElementById('emojiBtn');
+    const emojiPalette = document.getElementById('emojiPalette');
+    
+    if (emojiBtn && emojiPalette) {
+        // 絵文字ボタンクリックでパレットをトグル
+        emojiBtn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            // メディアメニューが開いていたら閉じる
+            if (mediaMenu) mediaMenu.classList.add('hidden');
+            emojiPalette.classList.toggle('hidden');
+        });
+        
+        // パレット外クリックで閉じる
+        document.addEventListener('click', (e) => {
+            if (!emojiPalette.contains(e.target) && e.target !== emojiBtn) {
+                emojiPalette.classList.add('hidden');
+            }
+        });
+        
+        // 絵文字クリックでテキストに挿入
+        emojiPalette.addEventListener('click', (e) => {
+            const emojiButton = e.target.closest('.emoji-btn');
+            if (emojiButton) {
+                const emoji = emojiButton.dataset.emoji;
+                if (emoji) {
+                    insertEmojiAtCursor(memoInput, emoji);
+                    emojiPalette.classList.add('hidden');
+                }
+            }
+        });
+    }
 
+    if (addMediaBtn) {
         // カメラ/ギャラリー起動ボタン
         if (cameraBtn) cameraBtn.addEventListener('click', async () => {
             mediaMenu.classList.add('hidden');
@@ -769,6 +804,32 @@ async function capturePhotoFromCamera() {
     });
 }
 
+/**
+ * Insert emoji at cursor position in textarea
+ * カーソル位置に絵文字を挿入し、カーソル位置を絵文字の後ろに移動します
+ */
+function insertEmojiAtCursor(textarea, emoji) {
+    const start = textarea.selectionStart;
+    const end = textarea.selectionEnd;
+    const text = textarea.value;
+    
+    // カーソル位置に絵文字を挿入
+    textarea.value = text.substring(0, start) + emoji + text.substring(end);
+    
+    // カーソルを絵文字の後ろに移動
+    const newPos = start + emoji.length;
+    textarea.setSelectionRange(newPos, newPos);
+    
+    // テキストエリアにフォーカスを戻す
+    textarea.focus();
+    
+    // 下書き保存を更新
+    localStorage.setItem(DRAFT_KEY, textarea.value);
+    
+    // inputイベントを発火して高さ調整
+    textarea.dispatchEvent(new Event('input'));
+}
+
 function readFileAsBase64(file) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
@@ -832,79 +893,104 @@ function addChatMessage(type, message, properties = null, modelInfo = null) {
     saveChatHistory();
 }
 
+/**
+ * Check if a message contains only emoji characters
+ * 絵文字のみで構成されているかチェック
+ */
+function isEmojiOnly(text) {
+    if (!text) return false;
+    // Remove whitespace and check if remaining is all emoji
+    const trimmed = text.trim();
+    if (trimmed.length === 0) return false;
+    
+    // Regex pattern for emoji (covers most common emoji ranges)
+    const emojiPattern = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Component})+$/u;
+    return emojiPattern.test(trimmed);
+}
+
 function renderChatHistory() {
     const container = document.getElementById('chatHistory');
     container.innerHTML = '';
     
     chatHistory.forEach((entry, index) => {
+        const isStamp = entry.type === 'user' && isEmojiOnly(entry.message);
+        
         const bubble = document.createElement('div');
-        bubble.className = `chat-bubble ${entry.type}`;
         
-        // メッセージ内容
-        bubble.innerHTML = entry.message.replace(/\n/g, '<br>');
-        
-        // ユーザーまたはAIメッセージにホバーボタンを追加
-        if (entry.type === 'user' || entry.type === 'ai') {
-            // Tap to show "Add to Notion"
-            bubble.style.cursor = 'pointer';
-            bubble.onclick = (e) => {
-                // Don't toggle if selecting text
-                if (window.getSelection().toString().length > 0) return;
-                
-                // Don't toggle if clicking a link/button inside (except this bubble's container)
-                if (e.target.tagName === 'A') return;
-
-                // Close other open bubbles
-                const wasShown = bubble.classList.contains('show-actions');
-                document.querySelectorAll('.chat-bubble.show-actions').forEach(b => {
-                    b.classList.remove('show-actions');
-                });
-
-                if (!wasShown) {
-                    bubble.classList.add('show-actions');
-                }
-                
-                e.stopPropagation(); // Prevent document click from closing it
-            };
-
-            const addBtn = document.createElement('button');
-            addBtn.className = 'bubble-add-btn';
-            addBtn.textContent = 'Notionに追加';
-            addBtn.onclick = (e) => {
-                e.stopPropagation();
-                handleAddFromBubble(entry);
-                // Optional: remove class after adding?
-                // bubble.classList.remove('show-actions'); 
-            };
-            bubble.appendChild(addBtn);
-        }
-        
-        // AIのモデル情報表示
-        if (entry.type === 'ai' && showModelInfo && entry.modelInfo) {
-            const infoDiv = document.createElement('div');
-            infoDiv.className = 'model-info-text';
-            const { model, usage, cost } = entry.modelInfo;
+        if (isStamp) {
+            // スタンプ表示（吹き出しなし、大きな絵文字）
+            bubble.className = 'chat-stamp';
+            bubble.textContent = entry.message.trim();
+        } else {
+            // 通常の吹き出し表示
+            bubble.className = `chat-bubble ${entry.type}`;
             
-            // Try to find model info to get provider prefix
-            const modelInfo = availableModels.find(m => m.id === model);
-            const modelDisplay = modelInfo 
-                ? `[${modelInfo.provider}] ${modelInfo.name}`
-                : model;
-            
-            let infoText = `${modelDisplay}`;
-            if (cost) infoText += ` | $${parseFloat(cost).toFixed(5)}`;
-            // usage is object {prompt_tokens, completion_tokens, total_tokens}
-            if (usage && usage.total_tokens) {
-                // 送信・受信トークンを個別表示
-                if (usage.prompt_tokens && usage.completion_tokens) {
-                    infoText += ` | (送信:${usage.prompt_tokens} / 受信:${usage.completion_tokens})`;
-                } else {
-                    infoText += ` | ${usage.total_tokens}`;
-                }
+            // メッセージ内容
+            bubble.innerHTML = entry.message.replace(/\n/g, '<br>');
+        
+            // ユーザーまたはAIメッセージにホバーボタンを追加
+            if (entry.type === 'user' || entry.type === 'ai') {
+                // Tap to show "Add to Notion"
+                bubble.style.cursor = 'pointer';
+                bubble.onclick = (e) => {
+                    // Don't toggle if selecting text
+                    if (window.getSelection().toString().length > 0) return;
+                    
+                    // Don't toggle if clicking a link/button inside (except this bubble's container)
+                    if (e.target.tagName === 'A') return;
+
+                    // Close other open bubbles
+                    const wasShown = bubble.classList.contains('show-actions');
+                    document.querySelectorAll('.chat-bubble.show-actions').forEach(b => {
+                        b.classList.remove('show-actions');
+                    });
+
+                    if (!wasShown) {
+                        bubble.classList.add('show-actions');
+                    }
+                    
+                    e.stopPropagation(); // Prevent document click from closing it
+                };
+
+                const addBtn = document.createElement('button');
+                addBtn.className = 'bubble-add-btn';
+                addBtn.textContent = 'Notionに追加';
+                addBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    handleAddFromBubble(entry);
+                    // Optional: remove class after adding?
+                    // bubble.classList.remove('show-actions'); 
+                };
+                bubble.appendChild(addBtn);
             }
             
-            infoDiv.textContent = infoText;
-            bubble.appendChild(infoDiv);
+            // AIのモデル情報表示
+            if (entry.type === 'ai' && showModelInfo && entry.modelInfo) {
+                const infoDiv = document.createElement('div');
+                infoDiv.className = 'model-info-text';
+                const { model, usage, cost } = entry.modelInfo;
+                
+                // Try to find model info to get provider prefix
+                const modelInfo = availableModels.find(m => m.id === model);
+                const modelDisplay = modelInfo 
+                    ? `[${modelInfo.provider}] ${modelInfo.name}`
+                    : model;
+                
+                let infoText = `${modelDisplay}`;
+                if (cost) infoText += ` | $${parseFloat(cost).toFixed(5)}`;
+                // usage is object {prompt_tokens, completion_tokens, total_tokens}
+                if (usage && usage.total_tokens) {
+                    // 送信・受信トークンを個別表示
+                    if (usage.prompt_tokens && usage.completion_tokens) {
+                        infoText += ` | (送信:${usage.prompt_tokens} / 受信:${usage.completion_tokens})`;
+                    } else {
+                        infoText += ` | ${usage.total_tokens}`;
+                    }
+                }
+                
+                infoDiv.textContent = infoText;
+                bubble.appendChild(infoDiv);
+            }
         }
         
         container.appendChild(bubble);
