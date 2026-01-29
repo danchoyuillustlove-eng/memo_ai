@@ -44,6 +44,11 @@ DEFAULT_TEXT_MODEL = os.getenv("DEFAULT_TEXT_MODEL", "gemini/gemini-2.5-flash")
 # 画像を含むマルチモーダル入力の場合のデフォルト（Vision対応モデル必須）
 DEFAULT_MULTIMODAL_MODEL = os.getenv("DEFAULT_MULTIMODAL_MODEL", "gemini/gemini-2.5-flash")
 
+# --- デバッグモード設定 (Debug Mode) ---
+# デバッグエンドポイントとAIモデル選択機能を有効にします。
+# 本番環境では必ず False に設定してください。
+DEBUG_MODE = os.getenv("DEBUG_MODE", "false").lower() == "true"
+
 # --- デフォルトシステムプロンプト (Default System Prompt) ---
 # AIの基本的な役割定義。ターゲットごとに上書き可能です。
 # 環境変数でオーバーライド可能です。
