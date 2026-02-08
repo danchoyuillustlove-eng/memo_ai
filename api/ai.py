@@ -396,11 +396,13 @@ Restraints:
 - Structure:
 {{
   "message": "Response to the user",
+  "stamp": "😊",  // Optional: Use a single emoji stamp to express emotion (happy, thinking, surprised, etc.)
   "refined_text": "Refined version of the input, if applicable (or null)",
   "properties": {{ "Property Name": "Value" }} // Only if user intends to save data
 }}
 - If the user is just chatting, "properties" should be null.
-- If the user wants to save/add data, fill "properties" according to the Schema."""
+- If the user wants to save/add data, fill "properties" according to the Schema.
+- Use "stamp" field to express your emotion with a single emoji when appropriate (e.g., 😊 for happy, 🤔 for thinking, 😮 for surprised, 👍 for approval, ❤️ for appreciation). Only use when natural - not required for every response."""
     
     # メッセージ配列の構築
     messages = [{"role": "system", "content": system_message_content}]

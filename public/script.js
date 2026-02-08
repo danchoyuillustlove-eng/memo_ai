@@ -67,7 +67,7 @@ document.addEventListener('DOMContentLoaded', () => {
     const viewContentBtn = document.getElementById('viewContentBtn');
     const settingsBtn = document.getElementById('settingsBtn');
     const settingsMenu = document.getElementById('settingsMenu');
-    
+
     // --- 画像アップロード UI (Image Input Elements) ---
     const addMediaBtn = document.getElementById('addMediaBtn');
     const mediaMenu = document.getElementById('mediaMenu');
@@ -76,14 +76,14 @@ document.addEventListener('DOMContentLoaded', () => {
     const cameraInput = document.getElementById('cameraInput');
     const imageInput = document.getElementById('imageInput');
     const removeImageBtn = document.getElementById('removeImageBtn');
-    
+
     // メディアメニューのトグル
     if (addMediaBtn) {
         addMediaBtn.addEventListener('click', (e) => {
             e.stopPropagation();
             mediaMenu.classList.toggle('hidden');
         });
-        
+
         // メニュー外クリックで閉じる処理
         document.addEventListener('click', (e) => {
             if (mediaMenu && !mediaMenu.contains(e.target) && e.target !== addMediaBtn) {
@@ -91,11 +91,12 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    
+
     // --- 絵文字パレット UI (Emoji Palette) ---
     const emojiBtn = document.getElementById('emojiBtn');
     const emojiPalette = document.getElementById('emojiPalette');
-    
+    let emojiPaletteMode = 'insert'; // 'insert' または 'stamp'
+
     if (emojiBtn && emojiPalette) {
         // 絵文字ボタンクリックでパレットをトグル
         emojiBtn.addEventListener('click', (e) => {
@@ -104,21 +105,45 @@ document.addEventListener('DOMContentLoaded', () => {
             if (mediaMenu) mediaMenu.classList.add('hidden');
             emojiPalette.classList.toggle('hidden');
         });
-        
+
         // パレット外クリックで閉じる
         document.addEventListener('click', (e) => {
             if (!emojiPalette.contains(e.target) && e.target !== emojiBtn) {
                 emojiPalette.classList.add('hidden');
             }
         });
-        
-        // 絵文字クリックでテキストに挿入
+
+        // タブ切り替え処理
+        const tabInsert = document.getElementById('emojiTabInsert');
+        const tabStamp = document.getElementById('emojiTabStamp');
+
+        if (tabInsert && tabStamp) {
+            tabInsert.addEventListener('click', () => {
+                emojiPaletteMode = 'insert';
+                tabInsert.classList.add('active');
+                tabStamp.classList.remove('active');
+            });
+
+            tabStamp.addEventListener('click', () => {
+                emojiPaletteMode = 'stamp';
+                tabStamp.classList.add('active');
+                tabInsert.classList.remove('active');
+            });
+        }
+
+        // 絵文字クリックでモードに応じた処理
         emojiPalette.addEventListener('click', (e) => {
             const emojiButton = e.target.closest('.emoji-btn');
             if (emojiButton) {
                 const emoji = emojiButton.dataset.emoji;
                 if (emoji) {
-                    insertEmojiAtCursor(memoInput, emoji);
+                    if (emojiPaletteMode === 'stamp') {
+                        // スタンプモード: 絵文字をすぐにチャットに送信
+                        sendStamp(emoji);
+                    } else {
+                        // 挿入モード: テキストに挿入
+                        insertEmojiAtCursor(memoInput, emoji);
+                    }
                     emojiPalette.classList.add('hidden');
                 }
             }
@@ -129,10 +154,10 @@ document.addEventListener('DOMContentLoaded', () => {
         // カメラ/ギャラリー起動ボタン
         if (cameraBtn) cameraBtn.addEventListener('click', async () => {
             mediaMenu.classList.add('hidden');
-            
+
             // デバイス判定: モバイルならcapture属性、デスクトップならgetUserMedia
             const isMobile = /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent);
-            
+
             if (isMobile) {
                 // モバイル: 既存の実装（capture属性を使用）
                 cameraInput.click();
@@ -146,7 +171,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 }
             }
         });
-        
+
         if (galleryBtn) galleryBtn.addEventListener('click', () => {
             imageInput.click();
             mediaMenu.classList.add('hidden');
@@ -159,18 +184,18 @@ document.addEventListener('DOMContentLoaded', () => {
                 console.log('[Image Upload] No file selected');
                 return;
             }
-            
+
             console.log('[Image Upload] File selected:', file.name, file.size, 'bytes', file.type);
-            
+
             try {
                 updateState('📷', '画像を圧縮中...', { step: 'compressing' });
                 showToast("画像を処理中...");
-                
+
                 // クライアントサイドでの画像圧縮 (Canvasを使用)
                 // サーバーへの転送量を減らし、AIのトークン消費を抑えるために重要です。
                 const { base64, mimeType } = await compressImage(file);
                 console.log('[Image Upload] Image compressed, new size:', base64.length, 'chars');
-                
+
                 // プレビュー表示
                 setPreviewImage(base64, mimeType);
                 updateState('✅', '画像準備完了', { step: 'ready' });
@@ -179,25 +204,25 @@ document.addEventListener('DOMContentLoaded', () => {
                     const stateDisplay = document.getElementById('stateDisplay');
                     if (stateDisplay) stateDisplay.classList.add('hidden');
                 }, 2000);
-                
+
                 // 同じファイルを再選択できるようにリセット
-                e.target.value = ''; 
+                e.target.value = '';
             } catch (err) {
                 console.error('[Image Upload] Error:', err);
                 showToast("画像の読み込みに失敗しました: " + err.message);
             }
         };
-        
+
         if (cameraInput) cameraInput.addEventListener('change', handleFileSelect);
         if (imageInput) imageInput.addEventListener('change', handleFileSelect);
-        
+
         // 画像削除ボタン
         if (removeImageBtn) removeImageBtn.addEventListener('click', () => {
             console.log('[Image Upload] Removing image preview');
             clearPreviewImage();
         });
     }
-    
+
     // 1. ラストラフ（下書き）の復元
     // ブラウザのlocalStorageから編集中のテキストを復元します。
     const savedDraft = localStorage.getItem(DRAFT_KEY);
@@ -206,27 +231,27 @@ document.addEventListener('DOMContentLoaded', () => {
         // 高さ調整のためにinputイベントを発火
         memoInput.dispatchEvent(new Event('input'));
     }
-    
+
     // 2. テキストエリアの自動リサイズ (Auto-resize)
     // 入力内容に応じて高さを自動調整し、スマホでも見やすくします。
     memoInput.addEventListener('input', () => {
         memoInput.style.height = 'auto';
         memoInput.style.height = Math.min(memoInput.scrollHeight, 120) + 'px';
-        
+
         // 入力のたびに下書き保存
         localStorage.setItem(DRAFT_KEY, memoInput.value);
         updateSaveStatus("下書き保存中...");
     });
-    
+
     // 3. IME対応
     memoInput.addEventListener('compositionstart', () => {
         isComposing = true;
     });
-    
+
     memoInput.addEventListener('compositionend', () => {
         isComposing = false;
     });
-    
+
     // 4. Enterキーハンドラ
     memoInput.addEventListener('keydown', (e) => {
         if (e.key === 'Enter' && !e.shiftKey && !isComposing) {
@@ -234,16 +259,16 @@ document.addEventListener('DOMContentLoaded', () => {
             handleChatAI();
         }
     });
-    
+
     // 5. チャット履歴読み込み
     loadChatHistory();
-    
+
     // 6. ターゲット読み込み
     loadTargets(appSelector);
-    
+
     // 7. Load Models
     loadAvailableModels();
-    
+
     // 7.5 Load Settings
     const savedShowInfo = localStorage.getItem(SHOW_MODEL_INFO_KEY);
     if (savedShowInfo !== null) {
@@ -266,12 +291,12 @@ document.addEventListener('DOMContentLoaded', () => {
         if (savedRefState !== null) {
             referenceToggle.checked = savedRefState === 'true';
         }
-        
+
         referenceToggle.addEventListener('change', (e) => {
             localStorage.setItem(REFERENCE_PAGE_KEY, e.target.checked);
         });
     }
-    
+
     // 8. Settings Menu Logic
     if (settingsBtn) {
         settingsBtn.addEventListener('click', (e) => {
@@ -279,12 +304,12 @@ document.addEventListener('DOMContentLoaded', () => {
             toggleSettingsMenu();
         });
     }
-    
+
     document.addEventListener('click', (e) => {
         if (settingsMenu && !settingsMenu.classList.contains('hidden') && !settingsMenu.contains(e.target) && e.target !== settingsBtn) {
             settingsMenu.classList.add('hidden');
         }
-        
+
         // Close active chat bubbles when clicking outside
         document.querySelectorAll('.chat-bubble.show-actions').forEach(b => {
             b.classList.remove('show-actions');
@@ -298,7 +323,7 @@ document.addEventListener('DOMContentLoaded', () => {
             openPromptModal();
         });
     }
-    
+
     const modelSelectItem = document.getElementById('modelSelectMenuItem');
     if (modelSelectItem) {
         modelSelectItem.addEventListener('click', () => {
@@ -306,7 +331,7 @@ document.addEventListener('DOMContentLoaded', () => {
             openModelModal();
         });
     }
-    
+
     // Model Modal Close
     const closeModelBtn = document.getElementById('closeModelModalBtn');
     const cancelModelBtn = document.getElementById('cancelModelBtn');
@@ -314,7 +339,7 @@ document.addEventListener('DOMContentLoaded', () => {
     if (closeModelBtn) closeModelBtn.addEventListener('click', closeModelModal);
     if (cancelModelBtn) cancelModelBtn.addEventListener('click', closeModelModal);
     if (saveModelBtn) saveModelBtn.addEventListener('click', saveModelSelection);
-    
+
     // 9. イベントリスナー登録 (Existing)
     appSelector.addEventListener('change', (e) => {
         const value = e.target.value;
@@ -331,21 +356,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
     if (sessionClearBtn) sessionClearBtn.addEventListener('click', handleSessionClear);
     if (viewContentBtn) viewContentBtn.addEventListener('click', openContentModal);
-    
 
-    
+
+
     // 10. プロパティセクション折りたたみ
     const togglePropsBtn = document.getElementById('togglePropsBtn');
     if (togglePropsBtn) {
         togglePropsBtn.addEventListener('click', () => {
             const section = document.getElementById('propertiesSection');
             section.classList.toggle('hidden');
-            togglePropsBtn.textContent = section.classList.contains('hidden') 
-                ? '▼ 属性を表示' 
+            togglePropsBtn.textContent = section.classList.contains('hidden')
+                ? '▼ 属性を表示'
                 : '▲ 属性を隠す';
         });
     }
-    
+
     // ⚠️ 本番環境では削除: デバッグメニュー
     const debugInfoItem = document.getElementById('debugInfoMenuItem');
     if (debugInfoItem) {
@@ -354,14 +379,14 @@ document.addEventListener('DOMContentLoaded', () => {
             openDebugModal();
         });
     }
-    
+
     const closeDebugModalBtn = document.getElementById('closeDebugModalBtn');
     const closeDebugBtn = document.getElementById('closeDebugBtn');
     const refreshDebugBtn = document.getElementById('refreshDebugBtn');
     if (closeDebugModalBtn) closeDebugModalBtn.addEventListener('click', closeDebugModal);
     if (closeDebugBtn) closeDebugBtn.addEventListener('click', closeDebugModal);
     if (refreshDebugBtn) refreshDebugBtn.addEventListener('click', loadDebugInfo);
-    
+
     // DEBUG_MODE状態を取得してUI制御
     initializeDebugMode();
 });
@@ -391,15 +416,15 @@ function closeDebugModal() {
 async function loadDebugInfo() {
     const content = document.getElementById('debugInfoContent');
     if (!content) return;
-    
+
     content.innerHTML = '<div class="loading-indicator"><div class="spinner"></div><span>読み込み中...</span></div>';
-    
+
     try {
         const res = await fetch('/api/debug5075378');
         if (!res.ok) {
             throw new Error(`HTTP ${res.status}: ${res.statusText}`);
         }
-        
+
         const data = await res.json();
         renderDebugInfo(data);
     } catch (err) {
@@ -422,12 +447,12 @@ async function loadDebugInfo() {
 function renderDebugInfo(data) {
     const content = document.getElementById('debugInfoContent');
     if (!content) return;
-    
+
     let html = '';
-    
+
     // タイムスタンプ
     html += `<div class="debug-timestamp">取得時刻: ${data.timestamp || 'N/A'}</div>`;
-    
+
     // 環境情報
     html += '<div class="debug-section">';
     html += '<h3>⚙️ 環境情報</h3>';
@@ -441,7 +466,7 @@ function renderDebugInfo(data) {
         `;
     }
     html += '</div></div>';
-    
+
     // パス情報
     html += '<div class="debug-section">';
     html += '<h3>📁 パス情報</h3>';
@@ -455,7 +480,7 @@ function renderDebugInfo(data) {
         `;
     }
     html += '</div></div>';
-    
+
     // ファイルシステム
     html += '<div class="debug-section">';
     html += '<h3>🗂️ ファイルシステム</h3>';
@@ -474,7 +499,7 @@ function renderDebugInfo(data) {
         `;
     }
     html += '</div></div>';
-    
+
     // 環境変数（マスク済み）
     if (data.env_vars) {
         html += '<div class="debug-section">';
@@ -490,7 +515,7 @@ function renderDebugInfo(data) {
         }
         html += '</div></div>';
     }
-    
+
     // ルート情報
     html += '<div class="debug-section">';
     html += '<h3>🛣️ 登録ルート</h3>';
@@ -505,7 +530,7 @@ function renderDebugInfo(data) {
         `;
     });
     html += '</div></div>';
-    
+
     content.innerHTML = html;
 }
 
@@ -519,21 +544,21 @@ async function initializeDebugMode() {
             console.warn('[DEBUG_MODE] Failed to fetch config, assuming debug_mode=false');
             return;
         }
-        
+
         const data = await res.json();
         serverDebugMode = data.debug_mode || false;
-        
+
         // デフォルトシステムプロンプトを更新
         if (data.default_system_prompt) {
             DEFAULT_SYSTEM_PROMPT = data.default_system_prompt;
             debugLog('[CONFIG] DEFAULT_SYSTEM_PROMPT loaded from backend');
         }
-        
+
         debugLog('[DEBUG_MODE] Server debug_mode:', serverDebugMode);
-        
+
         // UI要素の表示制御
         updateDebugModeUI();
-        
+
     } catch (err) {
         console.error('[DEBUG_MODE] Error fetching config:', err);
         serverDebugMode = false;
@@ -559,7 +584,7 @@ function updateDebugModeUI() {
             localStorage.removeItem('memo_ai_selected_model');
         }
     }
-    
+
     // デバッグメニューの表示制御
     const debugInfoItem = document.getElementById('debugInfoMenuItem');
     if (debugInfoItem) {
@@ -569,34 +594,34 @@ function updateDebugModeUI() {
             debugInfoItem.style.display = 'none';
         }
     }
-    
+
     // キャッシュ制御メタタグの動的追加（DEBUG_MODE時のみ）
     if (serverDebugMode) {
         // 既存のキャッシュ制御メタタグを削除
         const existingCacheTags = document.querySelectorAll('meta[http-equiv="Cache-Control"], meta[http-equiv="Pragma"], meta[http-equiv="Expires"]');
         existingCacheTags.forEach(tag => tag.remove());
-        
+
         // 新しいキャッシュ制御メタタグを追加
         const head = document.head;
-        
+
         const cacheControl = document.createElement('meta');
         cacheControl.httpEquiv = 'Cache-Control';
         cacheControl.content = 'no-cache, no-store, must-revalidate';
         head.appendChild(cacheControl);
-        
+
         const pragma = document.createElement('meta');
         pragma.httpEquiv = 'Pragma';
         pragma.content = 'no-cache';
         head.appendChild(pragma);
-        
+
         const expires = document.createElement('meta');
         expires.httpEquiv = 'Expires';
         expires.content = '0';
         head.appendChild(expires);
-        
+
         debugLog('[DEBUG_MODE] Cache control meta tags added');
     }
-    
+
     debugLog('[DEBUG_MODE] UI updated. Model selection:', serverDebugMode ? 'enabled' : 'disabled');
 }
 
@@ -611,15 +636,15 @@ function updateDebugModeUI() {
 function compressImage(file, maxDimension = 600, quality = 0.7) {
     return new Promise((resolve, reject) => {
         const reader = new FileReader();
-        
+
         reader.onload = (e) => {
             const img = new Image();
-            
+
             img.onload = () => {
                 // Calculate new dimensions
                 let width = img.width;
                 let height = img.height;
-                
+
                 if (width > maxDimension || height > maxDimension) {
                     if (width > height) {
                         height = Math.round((height * maxDimension) / width);
@@ -629,21 +654,21 @@ function compressImage(file, maxDimension = 600, quality = 0.7) {
                         height = maxDimension;
                     }
                 }
-                
+
                 console.log(`[Image Compress] Original: ${img.width}x${img.height}, Compressed: ${width}x${height}`);
-                
+
                 // Create canvas and compress
                 const canvas = document.createElement('canvas');
                 canvas.width = width;
                 canvas.height = height;
-                
+
                 const ctx = canvas.getContext('2d');
                 ctx.drawImage(img, 0, 0, width, height);
-                
+
                 // Convert to JPEG base64
                 const dataUrl = canvas.toDataURL('image/jpeg', quality);
                 const matches = dataUrl.match(/^data:(.+);base64,(.+)$/);
-                
+
                 if (matches && matches.length === 3) {
                     resolve({
                         mimeType: matches[1],
@@ -654,11 +679,11 @@ function compressImage(file, maxDimension = 600, quality = 0.7) {
                     reject(new Error('Failed to compress image'));
                 }
             };
-            
+
             img.onerror = () => reject(new Error('Failed to load image'));
             img.src = e.target.result;
         };
-        
+
         reader.onerror = () => reject(new Error('Failed to read file'));
         reader.readAsDataURL(file);
     });
@@ -671,15 +696,15 @@ function compressImage(file, maxDimension = 600, quality = 0.7) {
 async function capturePhotoFromCamera() {
     return new Promise(async (resolve, reject) => {
         let stream = null;
-        
+
         try {
             // Request camera access
             updateState('📷', 'カメラへのアクセスを要求中...', { step: 'requesting_camera' });
-            stream = await navigator.mediaDevices.getUserMedia({ 
+            stream = await navigator.mediaDevices.getUserMedia({
                 video: { facingMode: 'user' },
-                audio: false 
+                audio: false
             });
-            
+
             // Create modal with video preview
             const modal = document.createElement('div');
             modal.className = 'modal';
@@ -700,20 +725,20 @@ async function capturePhotoFromCamera() {
                     </div>
                 </div>
             `;
-            
+
             document.body.appendChild(modal);
-            
+
             const video = document.getElementById('cameraPreview');
             const canvas = document.getElementById('cameraCanvas');
             const captureBtn = document.getElementById('capturePhoto');
             const cancelBtn = document.getElementById('cancelCamera');
             const closeBtn = document.getElementById('closeCameraModal');
-            
+
             // Start video stream
             video.srcObject = stream;
-            
+
             updateState('✅', 'カメラ準備完了', { step: 'camera_ready' });
-            
+
             const cleanup = () => {
                 if (stream) {
                     stream.getTracks().forEach(track => track.stop());
@@ -722,32 +747,32 @@ async function capturePhotoFromCamera() {
                 const stateDisplay = document.getElementById('stateDisplay');
                 if (stateDisplay) stateDisplay.classList.add('hidden');
             };
-            
+
             // Capture button handler
             captureBtn.addEventListener('click', async () => {
                 try {
                     updateState('📸', '写真を撮影中...', { step: 'capturing' });
-                    
+
                     // Set canvas dimensions to match video
                     canvas.width = video.videoWidth;
                     canvas.height = video.videoHeight;
-                    
+
                     // Draw current frame to canvas
                     const ctx = canvas.getContext('2d');
                     ctx.drawImage(video, 0, 0);
-                    
+
                     // Convert to blob and compress
                     canvas.toBlob(async (blob) => {
                         try {
                             // Convert blob to file
                             const file = new File([blob], 'camera-photo.jpg', { type: 'image/jpeg' });
-                            
+
                             // Compress the image
                             const { base64, mimeType } = await compressImage(file);
-                            
+
                             // Set preview
                             setPreviewImage(base64, mimeType);
-                            
+
                             cleanup();
                             updateState('✅', '写真を保存しました', { step: 'saved' });
                             showToast("写真を撮影しました");
@@ -755,34 +780,34 @@ async function capturePhotoFromCamera() {
                                 const stateDisplay = document.getElementById('stateDisplay');
                                 if (stateDisplay) stateDisplay.classList.add('hidden');
                             }, 2000);
-                            
+
                             resolve();
                         } catch (err) {
                             cleanup();
                             reject(err);
                         }
                     }, 'image/jpeg', 0.9);
-                    
+
                 } catch (err) {
                     cleanup();
                     reject(err);
                 }
             });
-            
+
             // Cancel/Close handlers
             const handleCancel = () => {
                 cleanup();
                 resolve(); // Not an error, just cancelled
             };
-            
+
             cancelBtn.addEventListener('click', handleCancel);
             closeBtn.addEventListener('click', handleCancel);
-            
+
         } catch (err) {
             if (stream) {
                 stream.getTracks().forEach(track => track.stop());
             }
-            
+
             // Translate common errors
             let errorMsg = err.message;
             if (err.name === 'NotAllowedError' || err.name === 'PermissionDeniedError') {
@@ -792,13 +817,13 @@ async function capturePhotoFromCamera() {
             } else if (err.name === 'NotReadableError' || err.name === 'TrackStartError') {
                 errorMsg = 'カメラは別のアプリケーションで使用中です';
             }
-            
+
             updateState('❌', 'カメラアクセスに失敗', { step: 'error', error: errorMsg });
             setTimeout(() => {
                 const stateDisplay = document.getElementById('stateDisplay');
                 if (stateDisplay) stateDisplay.classList.add('hidden');
             }, 3000);
-            
+
             reject(new Error(errorMsg));
         }
     });
@@ -812,22 +837,77 @@ function insertEmojiAtCursor(textarea, emoji) {
     const start = textarea.selectionStart;
     const end = textarea.selectionEnd;
     const text = textarea.value;
-    
+
     // カーソル位置に絵文字を挿入
     textarea.value = text.substring(0, start) + emoji + text.substring(end);
-    
+
     // カーソルを絵文字の後ろに移動
     const newPos = start + emoji.length;
     textarea.setSelectionRange(newPos, newPos);
-    
+
     // テキストエリアにフォーカスを戻す
     textarea.focus();
-    
+
     // 下書き保存を更新
     localStorage.setItem(DRAFT_KEY, textarea.value);
-    
+
     // inputイベントを発火して高さ調整
     textarea.dispatchEvent(new Event('input'));
+}
+
+/**
+ * スタンプ（絵文字）をチャットに送信
+ * スタンプモードで絵文字をタップしたときに呼ばれる
+ */
+async function sendStamp(emoji) {
+    // スタンプをユーザーメッセージとして追加
+    addChatMessage('user', emoji);
+    chatSession.push({ role: 'user', content: emoji });
+
+    // AIに送信（スタンプに対してAIも反応できる）
+    try {
+        showAITypingIndicator();
+
+        const payload = {
+            text: emoji,
+            target_id: currentTargetId,
+            system_prompt: currentSystemPrompt || DEFAULT_SYSTEM_PROMPT,
+            session_history: chatSession.slice(-10),
+            use_reference_page: document.getElementById('referencePageToggle')?.checked ?? true
+        };
+
+        const res = await fetch('/api/chat', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+
+        hideAITypingIndicator();
+
+        if (!res.ok) {
+            console.error('Stamp send failed:', res.status);
+            return;
+        }
+
+        const data = await res.json();
+
+        if (data.cost) {
+            updateSessionCost(data.cost);
+        }
+
+        if (data.message) {
+            const modelInfo = {
+                model: data.model,
+                usage: data.usage,
+                cost: data.cost
+            };
+            addChatMessage('ai', data.message, null, modelInfo, data.stamp || null);
+            chatSession.push({ role: 'assistant', content: data.message });
+        }
+    } catch (e) {
+        hideAITypingIndicator();
+        console.error('Stamp send error:', e);
+    }
 }
 
 function readFileAsBase64(file) {
@@ -856,10 +936,10 @@ function setPreviewImage(base64, mimeType) {
     console.log('[Preview] Setting preview image, mime:', mimeType, 'size:', base64.length, 'chars');
     currentImageBase64 = base64;
     currentImageMimeType = mimeType;
-    
+
     const previewArea = document.getElementById('imagePreviewArea');
     const previewImg = document.getElementById('previewImg');
-    
+
     previewImg.src = `data:${mimeType};base64,${base64}`;
     previewArea.classList.remove('hidden');
     console.log('[Preview] Preview area shown');
@@ -869,25 +949,26 @@ function clearPreviewImage() {
     console.log('[Preview] Clearing preview image');
     currentImageBase64 = null;
     currentImageMimeType = null;
-    
+
     const previewArea = document.getElementById('imagePreviewArea');
     const previewImg = document.getElementById('previewImg');
-    
+
     previewImg.src = '';
     previewArea.classList.add('hidden');
 }
 
 // --- チャット履歴管理 ---
 
-function addChatMessage(type, message, properties = null, modelInfo = null) {
+function addChatMessage(type, message, properties = null, modelInfo = null, stamp = null) {
     const entry = {
         type: type,  // 'user' | 'ai' | 'system'
         message: message,
         properties: properties,
         timestamp: Date.now(),
-        modelInfo: modelInfo
+        modelInfo: modelInfo,
+        stamp: stamp  // AIの感情表現スタンプ（絵文字）
     };
-    
+
     chatHistory.push(entry);
     renderChatHistory();
     saveChatHistory();
@@ -902,7 +983,7 @@ function isEmojiOnly(text) {
     // Remove whitespace and check if remaining is all emoji
     const trimmed = text.trim();
     if (trimmed.length === 0) return false;
-    
+
     // Regex pattern for emoji (covers most common emoji ranges)
     const emojiPattern = /^(?:\p{Emoji_Presentation}|\p{Emoji}\uFE0F|\p{Emoji_Modifier_Base}\p{Emoji_Modifier}?|\p{Emoji_Component})+$/u;
     return emojiPattern.test(trimmed);
@@ -911,12 +992,12 @@ function isEmojiOnly(text) {
 function renderChatHistory() {
     const container = document.getElementById('chatHistory');
     container.innerHTML = '';
-    
+
     chatHistory.forEach((entry, index) => {
         const isStamp = entry.type === 'user' && isEmojiOnly(entry.message);
-        
+
         const bubble = document.createElement('div');
-        
+
         if (isStamp) {
             // スタンプ表示（吹き出しなし、大きな絵文字）
             bubble.className = 'chat-stamp';
@@ -924,10 +1005,10 @@ function renderChatHistory() {
         } else {
             // 通常の吹き出し表示
             bubble.className = `chat-bubble ${entry.type}`;
-            
+
             // メッセージ内容
             bubble.innerHTML = entry.message.replace(/\n/g, '<br>');
-        
+
             // ユーザーまたはAIメッセージにホバーボタンを追加
             if (entry.type === 'user' || entry.type === 'ai') {
                 // Tap to show "Add to Notion"
@@ -935,7 +1016,7 @@ function renderChatHistory() {
                 bubble.onclick = (e) => {
                     // Don't toggle if selecting text
                     if (window.getSelection().toString().length > 0) return;
-                    
+
                     // Don't toggle if clicking a link/button inside (except this bubble's container)
                     if (e.target.tagName === 'A') return;
 
@@ -948,7 +1029,7 @@ function renderChatHistory() {
                     if (!wasShown) {
                         bubble.classList.add('show-actions');
                     }
-                    
+
                     e.stopPropagation(); // Prevent document click from closing it
                 };
 
@@ -962,20 +1043,59 @@ function renderChatHistory() {
                     // bubble.classList.remove('show-actions'); 
                 };
                 bubble.appendChild(addBtn);
+
+                // リアクションボタン
+                const reactBtn = document.createElement('button');
+                reactBtn.className = 'bubble-react-btn';
+                reactBtn.textContent = '😀';
+                reactBtn.title = 'リアクション';
+                reactBtn.onclick = (e) => {
+                    e.stopPropagation();
+                    showReactionPicker(index, bubble);
+                };
+                bubble.appendChild(reactBtn);
             }
-            
+
+            // リアクション表示
+            if (entry.reactions && entry.reactions.length > 0) {
+                const reactionsDiv = document.createElement('div');
+                reactionsDiv.className = 'message-reactions';
+                entry.reactions.forEach(reaction => {
+                    const reactionItem = document.createElement('span');
+                    reactionItem.className = 'reaction-item';
+                    reactionItem.textContent = `${reaction.emoji}`;
+                    if (reaction.count > 1) {
+                        reactionItem.textContent += ` ${reaction.count}`;
+                    }
+                    reactionItem.onclick = (e) => {
+                        e.stopPropagation();
+                        toggleReaction(index, reaction.emoji);
+                    };
+                    reactionsDiv.appendChild(reactionItem);
+                });
+                bubble.appendChild(reactionsDiv);
+            }
+
+            // AIのスタンプ表示（感情表現）
+            if (entry.type === 'ai' && entry.stamp) {
+                const stampDiv = document.createElement('div');
+                stampDiv.className = 'ai-stamp';
+                stampDiv.textContent = entry.stamp;
+                bubble.insertBefore(stampDiv, bubble.firstChild);
+            }
+
             // AIのモデル情報表示
             if (entry.type === 'ai' && showModelInfo && entry.modelInfo) {
                 const infoDiv = document.createElement('div');
                 infoDiv.className = 'model-info-text';
                 const { model, usage, cost } = entry.modelInfo;
-                
+
                 // Try to find model info to get provider prefix
                 const modelInfo = availableModels.find(m => m.id === model);
-                const modelDisplay = modelInfo 
+                const modelDisplay = modelInfo
                     ? `[${modelInfo.provider}] ${modelInfo.name}`
                     : model;
-                
+
                 let infoText = `${modelDisplay}`;
                 if (cost) infoText += ` | $${parseFloat(cost).toFixed(5)}`;
                 // usage is object {prompt_tokens, completion_tokens, total_tokens}
@@ -987,17 +1107,85 @@ function renderChatHistory() {
                         infoText += ` | ${usage.total_tokens}`;
                     }
                 }
-                
+
                 infoDiv.textContent = infoText;
                 bubble.appendChild(infoDiv);
             }
         }
-        
+
         container.appendChild(bubble);
     });
-    
+
     // 最下部にスクロール
     container.scrollTop = container.scrollHeight;
+}
+
+/**
+ * リアクションピッカーを表示
+ */
+function showReactionPicker(messageIndex, bubbleElement) {
+    // 既存のピッカーがあれば削除
+    const existingPicker = document.querySelector('.reaction-picker');
+    if (existingPicker) existingPicker.remove();
+
+    const picker = document.createElement('div');
+    picker.className = 'reaction-picker';
+
+    // よく使うリアクション絵文字
+    const reactions = ['👍', '❤️', '😊', '😂', '😮', '😢', '👏', '🎉'];
+
+    reactions.forEach(emoji => {
+        const btn = document.createElement('button');
+        btn.className = 'reaction-picker-btn';
+        btn.textContent = emoji;
+        btn.onclick = (e) => {
+            e.stopPropagation();
+            toggleReaction(messageIndex, emoji);
+            picker.remove();
+        };
+        picker.appendChild(btn);
+    });
+
+    // バブルの下に表示
+    bubbleElement.appendChild(picker);
+
+    // 外側クリックで閉じる
+    setTimeout(() => {
+        document.addEventListener('click', function closePicker(e) {
+            if (!picker.contains(e.target)) {
+                picker.remove();
+                document.removeEventListener('click', closePicker);
+            }
+        });
+    }, 0);
+}
+
+/**
+ * リアクションを追加/削除
+ */
+function toggleReaction(messageIndex, emoji) {
+    const entry = chatHistory[messageIndex];
+    if (!entry) return;
+
+    // reactionsフィールドがなければ初期化
+    if (!entry.reactions) {
+        entry.reactions = [];
+    }
+
+    // 既存のリアクションを探す
+    const existingIndex = entry.reactions.findIndex(r => r.emoji === emoji);
+
+    if (existingIndex >= 0) {
+        // 既にあれば削除
+        entry.reactions.splice(existingIndex, 1);
+    } else {
+        // なければ追加
+        entry.reactions.push({ emoji: emoji, count: 1 });
+    }
+
+    // 再描画と保存
+    renderChatHistory();
+    saveChatHistory();
 }
 
 function saveChatHistory() {
@@ -1011,30 +1199,30 @@ function loadChatHistory() {
         try {
             chatHistory = JSON.parse(saved);
             renderChatHistory();
-            
+
             // Rebuild chatSession for API context
             chatSession = chatHistory
                 .filter(entry => ['user', 'ai'].includes(entry.type))
                 .map(entry => {
                     let content = entry.message;
-                    
+
                     // 画像タグを削除して、テキストと[画像送信]のみを保持
                     // 例: "テキスト<br>[画像送信]<img...>" -> "テキスト [画像送信]"
                     content = content.replace(/\u003cimg[^>]*>/g, ''); // imgタグを削除
                     content = content.replace(/\u003cbr\u003e/g, ' '); // <br>をスペースに置換
                     content = content.trim(); // 余分な空白を削除
-                    
+
                     return {
                         role: entry.type === 'user' ? 'user' : 'assistant',
                         content: content
                     };
                 });
-            
+
             // If the last message was from user and we are reloading, 
             // we might want to ensure we don't double-send or anything, 
             // but for now just restoring context is enough.
-            
-        } catch(e) {
+
+        } catch (e) {
             console.error("History parse error", e);
         }
     }
@@ -1056,28 +1244,28 @@ async function handleChatAI() {
     console.log('[handleChatAI] Function called');
     const memoInput = document.getElementById('memoInput');
     const text = memoInput.value.trim();
-    
+
     console.log('[handleChatAI] Text:', text ? `"${text}"` : '(empty)');
     console.log('[handleChatAI] Has image:', !!currentImageBase64);
     console.log('[handleChatAI] Target ID:', currentTargetId);
-    
+
     // 入力チェック: テキストまたは画像が必須
     if (!text && !currentImageBase64) {
         console.log('[handleChatAI] Early return: no text and no image');
         showToast("テキストまたは画像を入力してください");
         return;
     }
-    
+
     // ターゲット未選択チェック
     if (!currentTargetId) {
         console.log('[handleChatAI] Early return: no target selected');
         showToast("ターゲットを選択してください");
         return;
     }
-    
+
     console.log('[handleChatAI] Validation passed, preparing message');
     updateState('📝', 'メッセージを準備中...', { step: 'preparing' });
-    
+
     // 1. ユーザーメッセージの表示準備
     // テキストと画像（あれば）を組み合わせてチャットバブルに表示します。
     let displayMessage = text;
@@ -1085,21 +1273,21 @@ async function handleChatAI() {
         const imgTag = `<br><img src="data:${currentImageMimeType};base64,${currentImageBase64}" style="max-width:100px; border-radius:4px;">`;
         displayMessage = (text ? text + "<br>" : "") + "[画像送信]" + imgTag;
     }
-    
+
     addChatMessage('user', displayMessage);
-    
+
     // 重要: 送信データを一時変数にコピーしてからステートをクリアする
     // これにより、非同期処理中にユーザーが次の操作を行っても影響を受けません。
     const imageToSend = currentImageBase64;
     const mimeToSend = currentImageMimeType;
-    
+
     console.log('[handleChatAI] Image data copied:', imageToSend ? `${imageToSend.length} chars` : 'null');
-    
+
     // 2. 会話履歴の準備（現在のメッセージを追加する前に取得）
     // AIに送信する履歴には、現在のメッセージを含めず、直近10件のみを送信します。
     const historyToSend = chatSession.slice(-10);
     console.log('[handleChatAI] Sending conversation history:', historyToSend.length, 'messages');
-    
+
     // 3. AIへのコンテキスト用にメッセージを追加
     // 画像がある場合は、テキストと[画像送信]の両方を含めて履歴に記録します。
     let contextMessage = text || '';
@@ -1107,14 +1295,14 @@ async function handleChatAI() {
         contextMessage = contextMessage ? `${contextMessage} [画像送信]` : '[画像送信]';
     }
     if (contextMessage) {
-        chatSession.push({role: 'user', content: contextMessage});
+        chatSession.push({ role: 'user', content: contextMessage });
     }
-    
+
     // 入力欄とプレビューのクリア
     memoInput.value = '';
     memoInput.dispatchEvent(new Event('input'));
     clearPreviewImage();
-    
+
     // 4. 使用するAIモデルの決定
     // ユーザーが明示的に選択していない場合、画像ありならVisionモデル、なしならテキストモデルを自動選択します。
     const hasImage = !!imageToSend;
@@ -1122,10 +1310,10 @@ async function handleChatAI() {
     if (!modelToUse) {
         modelToUse = hasImage ? defaultMultimodalModel : defaultTextModel;
     }
-    
+
     // UI表示用モデル名の取得
     const modelInfo = availableModels.find(m => m.id === modelToUse);
-    const modelDisplay = modelInfo 
+    const modelDisplay = modelInfo
         ? `[${modelInfo.provider}] ${modelInfo.name}`
         : (modelToUse || 'Auto');
 
@@ -1136,10 +1324,10 @@ async function handleChatAI() {
         autoSelected: !currentModel,
         step: 'analyzing'
     });
-    
+
     try {
         const systemPrompt = currentSystemPrompt || DEFAULT_SYSTEM_PROMPT;
-        
+
         // 「ページを参照」機能: オプションでターゲットの内容をコンテキストに含める
         const referenceToggle = document.getElementById('referencePageToggle');
         let referenceContext = '';
@@ -1169,53 +1357,53 @@ async function handleChatAI() {
             image_mime_type: mimeToSend,
             model: currentModel // 自動選択の場合はnullを送る
         };
-        
+
         updateState('📡', 'サーバーに送信中...', { step: 'uploading' });
         console.log('[handleChatAI] Sending request to /api/chat');
         console.log('[handleChatAI] Payload:', {
             ...payload,
             image_data: payload.image_data ? `(${payload.image_data.length} chars)` : null
         });
-        
+
         // 4. APIリクエスト
         updateState('📡', 'サーバーに送信中...', { step: 'uploading' });
         showAITypingIndicator(); // AI応答待ちインジケーターを表示
-        
+
         const res = await fetch('/api/chat', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(payload)
         });
-        
+
         console.log('[handleChatAI] Response status:', res.status);
         updateState('📥', 'レスポンスを処理中...', { step: 'processing_response' });
-        
+
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({ detail: "解析中にエラーが発生しました" }));
             throw new Error(errorData.detail?.message || JSON.stringify(errorData));
         }
-        
+
         const data = await res.json();
-        
+
         // AI応答受信後、インジケーターを非表示
         hideAITypingIndicator();
-        
+
         // コスト情報の更新
         if (data.cost) {
             updateSessionCost(data.cost);
         }
-        
+
         // ステート更新（完了）
         const completedModelInfo = availableModels.find(m => m.id === data.model);
-        const completedDisplay = completedModelInfo 
+        const completedDisplay = completedModelInfo
             ? `[${completedModelInfo.provider}] ${completedModelInfo.name}`
             : data.model;
-        
-        updateState('✅', `Completed (${completedDisplay})`, { 
+
+        updateState('✅', `Completed (${completedDisplay})`, {
             usage: data.usage,
             cost: data.cost
         });
-        
+
         // 5. AIメッセージの表示
         if (data.message) {
             const modelInfo = {
@@ -1223,24 +1411,25 @@ async function handleChatAI() {
                 usage: data.usage,
                 cost: data.cost
             };
-            addChatMessage('ai', data.message, null, modelInfo);
-            chatSession.push({role: 'assistant', content: data.message});
+            // data.stamp があれば感情表現スタンプとして渡す
+            addChatMessage('ai', data.message, null, modelInfo, data.stamp || null);
+            chatSession.push({ role: 'assistant', content: data.message });
         }
-        
+
         // 6. 抽出されたプロパティのフォーム反映
         // AIがJSONでプロパティを返した場合、自動的にフォームに入力します。
         if (data.properties) {
             fillForm(data.properties);
         }
-        
-    } catch(e) {
+
+    } catch (e) {
         console.error('[handleChatAI] Error:', e);
         hideAITypingIndicator(); // エラー時もインジケーターを非表示
         updateState('❌', 'Error', { error: e.message });
         addChatMessage('system', "エラー: " + e.message);
         showToast("エラー: " + e.message);
     }
-    
+
     console.log('[handleChatAI] Function completed');
 }
 
@@ -1288,9 +1477,9 @@ async function handleAddFromBubble(entry) {
         showToast('ターゲットを選択してください');
         return;
     }
-    
+
     const content = entry.message.replace(/<br>/g, '\n').replace(/整形案:\n/, '');
-    
+
     if (currentTargetType === 'database') {
         // データベースの場合は属性設定モーダルを表示
         // 簡易実装: 直接保存（将来的にはモーダルで属性設定可能に）
@@ -1303,17 +1492,17 @@ async function handleAddFromBubble(entry) {
 
 async function saveToDatabase(content) {
     setLoading(true, '保存中...');
-    
+
     try {
         // フォームから属性を取得
         const properties = {};
         const inputs = document.querySelectorAll('#propertiesForm .prop-input');
-        
+
         inputs.forEach(input => {
             const key = input.dataset.key;
             const type = input.dataset.type;
             let val = null;
-            
+
             if (type === 'title') val = { title: [{ text: { content: content.substring(0, 100) } }] };
             else if (type === 'rich_text') val = { rich_text: [{ text: { content: input.value || content } }] };
             else if (type === 'select') val = input.value ? { select: { name: input.value } } : null;
@@ -1323,13 +1512,13 @@ async function saveToDatabase(content) {
             }
             else if (type === 'date') val = input.value ? { date: { start: input.value } } : null;
             else if (type === 'checkbox') val = { checkbox: input.checked };
-            
+
             if (val) properties[key] = val;
         });
-        
+
         const res = await fetch('/api/save', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 target_db_id: currentTargetId,
                 target_type: 'database',
@@ -1337,11 +1526,11 @@ async function saveToDatabase(content) {
                 properties: properties
             })
         });
-        
+
         if (!res.ok) throw new Error('保存に失敗しました');
-        
+
         showToast('✅ Notionに追加しました');
-    } catch(e) {
+    } catch (e) {
         showToast('エラー: ' + e.message);
     } finally {
         setLoading(false);
@@ -1350,11 +1539,11 @@ async function saveToDatabase(content) {
 
 async function saveToPage(content) {
     setLoading(true, '保存中...');
-    
+
     try {
         const res = await fetch('/api/save', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 target_db_id: currentTargetId,
                 target_type: 'page',
@@ -1362,11 +1551,11 @@ async function saveToPage(content) {
                 properties: {}
             })
         });
-        
+
         if (!res.ok) throw new Error('保存に失敗しました');
-        
+
         showToast('✅ Notionに追加しました');
-    } catch(e) {
+    } catch (e) {
         showToast('エラー: ' + e.message);
     } finally {
         setLoading(false);
@@ -1377,19 +1566,19 @@ async function saveToPage(content) {
 
 async function fetchAndTruncatePageContent(targetId, targetType) {
     try {
-        const endpoint = targetType === 'database' 
+        const endpoint = targetType === 'database'
             ? `/api/content/database/${targetId}`
             : `/api/content/page/${targetId}`;
-        
+
         console.log('[fetchAndTruncatePageContent] Fetching from:', endpoint);
         const res = await fetch(endpoint);
         console.log('[fetchAndTruncatePageContent] Response status:', res.status);
         if (!res.ok) throw new Error('コンテンツ取得失敗');
-        
+
         const data = await res.json();
         console.log('[fetchAndTruncatePageContent] Data type:', data.type);
         let content = '';
-        
+
         if (data.type === 'database') {
             // DBの場合: 最新10行まで、各カラムを100文字まで
             const rows = data.rows.slice(0, 10);
@@ -1409,20 +1598,20 @@ async function fetchAndTruncatePageContent(targetId, targetType) {
                 if (truncated) content += truncated + '\n';
             });
         }
-        
+
         // 全体を2000文字に制限
         content = content.substring(0, 2000);
-        
+
         console.log('[fetchAndTruncatePageContent] Final content length:', content.length);
         if (!content.trim()) {
             console.log('[fetchAndTruncatePageContent] Content is empty, returning empty string');
             return '';
         }
-        
+
         const formattedContext = `<参考 既存の情報>\n${content}\n</参考 既存の情報>`;
         console.log('[fetchAndTruncatePageContent] Returning formatted context, length:', formattedContext.length);
         return formattedContext;
-    } catch(e) {
+    } catch (e) {
         console.error('[fetchAndTruncatePageContent] Error:', e);
         return '';
     }
@@ -1432,44 +1621,44 @@ async function fetchAndTruncatePageContent(targetId, targetType) {
 
 function renderDynamicForm(container, schema) {
     container.innerHTML = '';
-    
+
     // **重要**: 逆順で表示 (Reverse Order)
     // Notionのプロパティは通常、重要なものが最後（または最初）に来る傾向があるため、逆順に表示してUIの見栄えを調整しています。
     const entries = Object.entries(schema).reverse();
-    
+
     for (const [name, prop] of entries) {
         // Notionが自動管理するシステムプロパティは編集不要なのでスキップします。
         if (['created_time', 'last_edited_time', 'created_by', 'last_edited_by'].includes(prop.type)) {
             continue;
         }
-        
+
         const wrapper = document.createElement('div');
         wrapper.className = 'prop-field';
-        
+
         const label = document.createElement('label');
         label.className = 'prop-label';
         label.textContent = name;
         wrapper.appendChild(label);
-        
+
         let input;
-        
+
         // プロパティタイプに応じた入力フォームの生成
         if (prop.type === 'select' || prop.type === 'multi_select') {
             input = document.createElement('select');
             input.className = 'prop-input';
             input.dataset.key = name;
             input.dataset.type = prop.type;
-            
+
             if (prop.type === 'multi_select') {
                 input.multiple = true;
             }
-            
+
             // 空のオプション (デフォルト)
             const def = document.createElement('option');
             def.value = "";
             def.textContent = "(未選択)";
             input.appendChild(def);
-            
+
             // Notionスキーマに定義されている固定オプションを追加
             (prop[prop.type].options || []).forEach(o => {
                 const opt = document.createElement('option');
@@ -1477,7 +1666,7 @@ function renderDynamicForm(container, schema) {
                 opt.textContent = o.name;
                 input.appendChild(opt);
             });
-            
+
         } else if (prop.type === 'date') {
             input = document.createElement('input');
             input.type = 'date';
@@ -1498,11 +1687,11 @@ function renderDynamicForm(container, schema) {
             input.dataset.key = name;
             input.dataset.type = prop.type;
         }
-        
+
         wrapper.appendChild(input);
         container.appendChild(wrapper);
     }
-    
+
     // 過去のデータから動的にタグ候補を追加
     updateDynamicSelectOptions();
 }
@@ -1510,16 +1699,16 @@ function renderDynamicForm(container, schema) {
 function updateDynamicSelectOptions() {
     // プレビューデータ（過去の登録データ）がない場合は何もしない
     if (!currentPreviewData || !currentPreviewData.rows) return;
-    
+
     // 全てのselect/multi_select要素を取得
     const selects = document.querySelectorAll('#propertiesForm select');
-    
+
     selects.forEach(select => {
         const propName = select.dataset.key;
         const propType = select.dataset.type;
-        
+
         if (!propName || (propType !== 'select' && propType !== 'multi_select')) return;
-        
+
         // プレビューデータから既存の値を抽出してSetに格納（重複排除）
         const existingValues = new Set();
         currentPreviewData.rows.forEach(row => {
@@ -1533,13 +1722,13 @@ function updateDynamicSelectOptions() {
                 }
             }
         });
-        
+
         // スキーマに既に定義されているオプションも確認
         const schemaOptions = new Set();
         Array.from(select.options).forEach(opt => {
             if (opt.value) schemaOptions.add(opt.value);
         });
-        
+
         // スキーマにはないが、過去データには存在する値（Ad-hocなタグなど）をオプションに追加
         existingValues.forEach(value => {
             if (!schemaOptions.has(value)) {
@@ -1554,15 +1743,15 @@ function updateDynamicSelectOptions() {
 
 function fillForm(properties) {
     const inputs = document.querySelectorAll('#propertiesForm .prop-input');
-    
+
     inputs.forEach(input => {
         const key = input.dataset.key;
         const type = input.dataset.type;
-        
+
         if (!properties[key]) return; // No data for this field
-        
+
         const prop = properties[key];
-        
+
         try {
             if (type === 'title' && prop.title && prop.title[0]) {
                 input.value = prop.title[0].text.content;
@@ -1581,7 +1770,7 @@ function fillForm(properties) {
             } else if (type === 'checkbox') {
                 input.checked = prop.checkbox || false;
             }
-        } catch(e) {
+        } catch (e) {
             console.warn(`Failed to fill field ${key}:`, e);
         }
     });
@@ -1594,12 +1783,12 @@ function fillForm(properties) {
 function renderDatabaseTable(data, container) {
     if (!container) container = document.getElementById('contentModalPreview');
     container.innerHTML = '';
-    
+
     if (!data.columns || data.columns.length === 0) {
         container.innerHTML = '<p class="placeholder-text">(履歴なし)</p>';
         return;
     }
-    
+
     // カラムの並び替え (Column Sorting)
     // "Title" や "Name" などの主要なカラムを左側に表示し、可読性を向上させます。
     const sortedCols = [...data.columns].sort((a, b) => {
@@ -1614,14 +1803,14 @@ function renderDatabaseTable(data, container) {
     let html = '<div class="notion-table-wrapper"><table class="notion-table"><thead><tr>';
     sortedCols.forEach(col => html += `<th>${col}</th>`);
     html += '</tr></thead><tbody>';
-    
+
     // 最新のデータを10件まで表示
     data.rows.forEach(row => {
         html += '<tr>';
         sortedCols.forEach(col => html += `<td>${row[col] || ''}</td>`);
         html += '</tr>';
     });
-    
+
     html += '</tbody></table></div>';
     container.innerHTML = html;
 }
@@ -1629,12 +1818,12 @@ function renderDatabaseTable(data, container) {
 function renderPageBlocks(blocks, container) {
     if (!container) container = document.getElementById('contentModalPreview');
     container.innerHTML = '';
-    
+
     if (!blocks || blocks.length === 0) {
         container.innerHTML = '<p class="placeholder-text">(内容なし)</p>';
         return;
     }
-    
+
     // Notionのブロックを簡易的なHTML要素に変換して表示
     // 現在はプレーンテキストとして表示していますが、必要に応じてMarkdownレンダリングなどを追加可能です。
     blocks.forEach(block => {
@@ -1661,29 +1850,29 @@ async function fetchWithCache(url, key) {
                 console.log(`[Cache Hit] ${key}`);
                 return entry.data;
             }
-        } catch(e) { console.error("Cache parse error", e); }
+        } catch (e) { console.error("Cache parse error", e); }
     }
-    
+
     console.log(`[Cache Miss] Fetching ${url}`);
-    
+
     try {
         const res = await fetch(url);
-        
+
         if (!res.ok) {
             const errorBody = await res.text().catch(() => 'レスポンス本文を読み取れませんでした');
             throw new Error(`HTTPエラー ${res.status}: ${errorBody.substring(0, 100)}`);
         }
-        
+
         const data = await res.json();
-        
+
         // 新しいデータをキャッシュに保存
         localStorage.setItem(key, JSON.stringify({
             timestamp: Date.now(),
             data: data
         }));
         return data;
-        
-    } catch(e) {
+
+    } catch (e) {
         console.error('[Fetch Error]', { url, error: e });
         throw e;
     }
@@ -1695,7 +1884,7 @@ async function loadTargets(selector) {
         // ターゲットリスト取得（キャッシュ有効）
         const data = await fetchWithCache('/api/targets', TARGETS_CACHE_KEY);
         renderTargetOptions(selector, data.targets);
-    } catch(e) {
+    } catch (e) {
         console.error(e);
         showToast("ターゲット読み込み失敗: " + e.message);
         selector.innerHTML = '<option disabled selected>エラー</option>';
@@ -1705,7 +1894,7 @@ async function loadTargets(selector) {
 function renderTargetOptions(selector, targets) {
     selector.innerHTML = '';
     const lastSelected = localStorage.getItem(LAST_TARGET_KEY);
-    
+
     // 新規作成オプションを追加
     // このオプションが選択された場合、モーダルを表示するロジックが発火します。
     const newPageOpt = document.createElement('option');
@@ -1713,7 +1902,7 @@ function renderTargetOptions(selector, targets) {
     newPageOpt.textContent = '➕ 新規作成';
     newPageOpt.dataset.type = 'new';
     selector.appendChild(newPageOpt);
-    
+
     if (!targets || targets.length === 0) {
         const opt = document.createElement('option');
         opt.textContent = "ターゲットが見つかりません";
@@ -1729,7 +1918,7 @@ function renderTargetOptions(selector, targets) {
         if (t.id === lastSelected) opt.selected = true;
         selector.appendChild(opt);
     });
-    
+
     // 初期選択があれば反映してフォームをレンダリング
     if (selector.value && selector.value !== '__NEW_PAGE__') handleTargetChange(selector.value);
 }
@@ -1740,29 +1929,29 @@ async function handleTargetChange(targetId) {
     if (!targetId) return;
     currentTargetId = targetId;
     localStorage.setItem(LAST_TARGET_KEY, targetId);
-    
+
     const formContainer = document.getElementById('propertiesForm');
     formContainer.innerHTML = '<div class="spinner-small"></div> 読み込み中...';
-    
+
     const selector = document.getElementById('appSelector');
     const selectedOption = selector.options[selector.selectedIndex];
     currentTargetType = selectedOption ? selectedOption.dataset.type : 'database';
     currentTargetName = selectedOption ? selectedOption.textContent : '';
-    
+
     // システムプロンプト編集ボタンと内容ボタンを有効化
     const settingsBtn = document.getElementById('settingsBtn');
     const viewContentBtn = document.getElementById('viewContentBtn');
     if (settingsBtn) settingsBtn.disabled = false;
     if (viewContentBtn) viewContentBtn.disabled = false;
-    
+
     try {
         // スキーマ取得（キャッシュ有効）
         const data = await fetchWithCache(`/api/schema/${targetId}`, SCHEMA_CACHE_PREFIX + targetId);
         currentSchema = data.schema;
-        
+
         // 動的フォームの生成
         renderDynamicForm(formContainer, currentSchema);
-        
+
         // ターゲットタイプに応じたUI制御
         const propsSection = document.getElementById('propertiesSection');
         const propsContainer = document.getElementById('propertiesContainer');
@@ -1775,25 +1964,25 @@ async function handleTargetChange(targetId) {
             // ページには構造化されたプロパティがないためです。
             if (propsContainer) propsContainer.style.display = 'none';
         }
-        
+
         // システムプロンプトの初期化
         try {
             // localStorageからカスタムプロンプトを取得
             const promptKey = `${LOCAL_PROMPT_PREFIX}${targetId}`;
             currentSystemPrompt = localStorage.getItem(promptKey) || null;
-            
+
         } catch (e) {
             console.error("Prompt load failed:", e);
             currentSystemPrompt = null;
         }
 
-    } catch(e) {
+    } catch (e) {
         console.error('[handleTargetChange Error]', e);
         formContainer.innerHTML = `<p class="error">スキーマ読み込み失敗: ${e.message}</p>`;
-        
+
         // 初心者向けに具体的なエラーメッセージを表示
         let userMessage = "スキーマ読み込みエラー";
-        
+
         if (e.message.includes('Failed to fetch') || e.message.includes('NetworkError')) {
             // サーバーが起動していない、またはネットワーク接続エラー
             userMessage = "❌ サーバーに接続できません。サーバーが起動しているか確認してください";
@@ -1810,26 +1999,26 @@ async function handleTargetChange(targetId) {
             // その他のHTTPエラー
             userMessage = `❌ エラーが発生しました: ${e.message}`;
         }
-        
+
         showToast(userMessage);
     }
 }
 
 async function handleDirectSave() {
     if (!currentTargetId) return showToast("ターゲットを選択してください");
-    
+
     setLoading(true, "保存中...");
-    
+
     const text = document.getElementById('memoInput').value;
-    
+
     const properties = {};
     const inputs = document.querySelectorAll('#propertiesForm .prop-input');
-    
+
     inputs.forEach(input => {
         const key = input.dataset.key;
         const type = input.dataset.type;
         let val = null;
-        
+
         if (type === 'title') val = { title: [{ text: { content: input.value } }] };
         else if (type === 'rich_text') val = { rich_text: [{ text: { content: input.value } }] };
         else if (type === 'select') val = input.value ? { select: { name: input.value } } : null;
@@ -1839,14 +2028,14 @@ async function handleDirectSave() {
         }
         else if (type === 'date') val = input.value ? { date: { start: input.value } } : null;
         else if (type === 'checkbox') val = { checkbox: input.checked };
-        
+
         if (val) properties[key] = val;
     });
-    
+
     try {
         const res = await fetch('/api/save', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
                 target_db_id: currentTargetId,
                 target_type: currentTargetType,
@@ -1854,27 +2043,27 @@ async function handleDirectSave() {
                 properties: properties
             })
         });
-        
+
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({ detail: "保存中にエラーが発生しました" }));
             let detail = errorData.detail;
-            
+
             if (typeof detail === 'object') {
                 detail = JSON.stringify(detail, null, 2);
             }
-            
+
             const errMsg = `[保存エラー ${res.status}]\n${detail || '詳細はサーバーログを確認してください'}`;
             throw new Error(errMsg);
         }
-        
+
         addChatMessage('system', "Notionに保存しました！");
         showToast("保存完了");
-        
+
         document.getElementById('memoInput').value = "";
         document.getElementById('memoInput').dispatchEvent(new Event('input'));
         localStorage.removeItem(DRAFT_KEY);
-        
-    } catch(e) {
+
+    } catch (e) {
         showToast("エラー: " + e.message);
     } finally {
         setLoading(false);
@@ -1884,7 +2073,7 @@ async function handleDirectSave() {
 function setLoading(isLoading, text) {
     const ind = document.getElementById('loadingIndicator');
     const loadingText = document.getElementById('loadingText');
-    
+
     if (isLoading) {
         ind.classList.remove('hidden');
         if (loadingText && text) loadingText.textContent = text;
@@ -1919,20 +2108,20 @@ function openPromptModal() {
         showToast('ターゲットを選択してください');
         return;
     }
-    
+
     const modal = document.getElementById('promptModal');
     const targetNameSpan = document.getElementById('modalTargetName');
     const textarea = document.getElementById('promptTextarea');
     const saveBtn = document.getElementById('savePromptBtn');
     const resetBtn = document.getElementById('resetPromptBtn');
-    
+
     // ターゲット名を表示
     targetNameSpan.textContent = currentTargetName;
-    
+
     // カスタムプロンプトの有無を確認 (localStorage)
     const promptKey = `${LOCAL_PROMPT_PREFIX}${currentTargetId}`;
     const savedPrompt = localStorage.getItem(promptKey);
-    
+
     // カスタム設定がある場合のみリセットボタンを表示
     if (resetBtn) {
         if (savedPrompt) {
@@ -1941,12 +2130,12 @@ function openPromptModal() {
             resetBtn.classList.add('hidden');
         }
     }
-    
+
     // 現在のプロンプトまたはデフォルトを表示
     textarea.value = currentSystemPrompt || DEFAULT_SYSTEM_PROMPT;
     textarea.disabled = false;
     saveBtn.disabled = false;
-    
+
     // モーダルを表示
     modal.classList.remove('hidden');
 }
@@ -1954,12 +2143,12 @@ function openPromptModal() {
 function closePromptModal(force = false) {
     const modal = document.getElementById('promptModal');
     const textarea = document.getElementById('promptTextarea');
-    
+
     // 未保存の変更があるかチェック
     if (force !== true && textarea && !modal.classList.contains('hidden')) {
         const currentVal = textarea.value;
         const savedVal = currentSystemPrompt || DEFAULT_SYSTEM_PROMPT;
-        
+
         // 変更があり、かつ保存されていない場合
         if (currentVal !== savedVal) {
             const confirmMsg = "変更が保存されていません。破棄して閉じますか？";
@@ -1968,7 +2157,7 @@ function closePromptModal(force = false) {
             }
         }
     }
-    
+
     modal.classList.add('hidden');
 }
 
@@ -1979,18 +2168,18 @@ async function saveSystemPrompt() {
     const saveBtn = document.getElementById('savePromptBtn');
     const resetBtn = document.getElementById('resetPromptBtn');
     const newPrompt = textarea.value.trim();
-    
+
     saveBtn.disabled = true;
-    
+
     try {
         // デフォルトと異なる場合のみlocalStorageに保存
         const promptKey = `${LOCAL_PROMPT_PREFIX}${currentTargetId}`;
-        
+
         if (newPrompt && newPrompt !== DEFAULT_SYSTEM_PROMPT) {
             // カスタムプロンプトを保存
             localStorage.setItem(promptKey, newPrompt);
             currentSystemPrompt = newPrompt;
-            
+
             // リセットボタンを表示
             if (resetBtn) {
                 resetBtn.classList.remove('hidden');
@@ -1999,13 +2188,13 @@ async function saveSystemPrompt() {
             // デフォルトと同じならカスタム設定を削除
             localStorage.removeItem(promptKey);
             currentSystemPrompt = null;
-            
+
             // リセットボタンを隠す
             if (resetBtn) {
                 resetBtn.classList.add('hidden');
             }
         }
-        
+
         showToast('✅ システムプロンプトを保存しました');
     } catch (e) {
         console.error('Failed to save prompt:', e);
@@ -2018,23 +2207,23 @@ async function saveSystemPrompt() {
 
 function resetSystemPrompt() {
     if (!currentTargetId) return;
-    
+
     const promptKey = `${LOCAL_PROMPT_PREFIX}${currentTargetId}`;
     localStorage.removeItem(promptKey); // 設定を削除
     currentSystemPrompt = null;
-    
+
     // テキストエリアをデフォルトに戻す
     const textarea = document.getElementById('promptTextarea');
     if (textarea) {
         textarea.value = DEFAULT_SYSTEM_PROMPT;
     }
-    
+
     // リセットボタンを隠す
     const resetBtn = document.getElementById('resetPromptBtn');
     if (resetBtn) {
         resetBtn.classList.add('hidden');
     }
-    
+
     showToast('✅ デフォルトに戻しました');
 }
 
@@ -2071,7 +2260,7 @@ document.addEventListener('DOMContentLoaded', () => {
             const promptModal = document.getElementById('promptModal');
             const newPageModal = document.getElementById('newPageModal');
             const contentModal = document.getElementById('contentModal');
-            
+
             if (promptModal && !promptModal.classList.contains('hidden')) {
                 closePromptModal();
             } else if (newPageModal && !newPageModal.classList.contains('hidden')) {
@@ -2081,17 +2270,17 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         }
     });
-    
+
     // 新規ページモーダルのイベントリスナー
     const closeNewPageModalBtn = document.getElementById('closeNewPageModalBtn');
     const cancelNewPageBtn = document.getElementById('cancelNewPageBtn');
     const createNewPageBtn = document.getElementById('createNewPageBtn');
     const newPageModal = document.getElementById('newPageModal');
-    
+
     if (closeNewPageModalBtn) closeNewPageModalBtn.addEventListener('click', closeNewPageModal);
     if (cancelNewPageBtn) cancelNewPageBtn.addEventListener('click', closeNewPageModal);
     if (createNewPageBtn) createNewPageBtn.addEventListener('click', createNewPage);
-    
+
     if (newPageModal) {
         newPageModal.addEventListener('click', (e) => {
             if (e.target.id === 'newPageModal') {
@@ -2099,13 +2288,13 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         });
     }
-    
+
     // ページ内容モーダルのイベントリスナー
     const closeContentModalBtn = document.getElementById('closeContentModalBtn');
     const contentModal = document.getElementById('contentModal');
-    
+
     if (closeContentModalBtn) closeContentModalBtn.addEventListener('click', closeContentModal);
-    
+
     if (contentModal) {
         contentModal.addEventListener('click', (e) => {
             if (e.target.id === 'contentModal') {
@@ -2120,7 +2309,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function openNewPageModal() {
     const modal = document.getElementById('newPageModal');
     const input = document.getElementById('newPageNameInput');
-    
+
     if (input) input.value = '';
     if (modal) modal.classList.remove('hidden');
 }
@@ -2133,45 +2322,45 @@ function closeNewPageModal() {
 async function createNewPage() {
     const input = document.getElementById('newPageNameInput');
     const pageName = input.value.trim();
-    
+
     if (!pageName) {
         showToast('ページ名を入力してください');
         return;
     }
-    
+
     setLoading(true, '新規ページ作成中...');
-    
+
     try {
         // APIを呼び出してページを作成
         const res = await fetch('/api/pages/create', {
             method: 'POST',
-            headers: {'Content-Type': 'application/json'},
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ page_name: pageName })
         });
-        
+
         if (!res.ok) {
             const errorData = await res.json().catch(() => ({ detail: "ページ作成中にエラーが発生しました" }));
             throw new Error(errorData.detail || 'ページ作成に失敗しました');
         }
-        
+
         const newPage = await res.json();
-        
+
         showToast('✅ ページを作成しました');
         closeNewPageModal();
-        
+
         // キャッシュをクリアしてターゲットリストをリロード
         // これにより、新しいページがドロップダウンリストにすぐに表示されます。
         localStorage.removeItem(TARGETS_CACHE_KEY);
         const appSelector = document.getElementById('appSelector');
         await loadTargets(appSelector);
-        
+
         // 新規作成したページを自動選択
         if (newPage.id) {
             appSelector.value = newPage.id;
             await handleTargetChange(newPage.id);
         }
-        
-    } catch(e) {
+
+    } catch (e) {
         showToast('エラー: ' + e.message);
     } finally {
         setLoading(false);
@@ -2185,11 +2374,11 @@ function openContentModal() {
         showToast('ターゲットを選択してください');
         return;
     }
-    
+
     // 内蔵ビューワーではなく、ブラウザでNotionページを直接開く
     const notionUrl = `https://www.notion.so/${currentTargetId.replace(/-/g, '')}`;
     window.open(notionUrl, '_blank');
-    
+
     showToast('Notionページを開きました');
 }
 
@@ -2201,24 +2390,24 @@ function closeContentModal() {
 async function fetchAndDisplayContentInModal(targetId, targetType) {
     const container = document.getElementById('contentModalPreview');
     if (!container) return;
-    
+
     // Clear previous
     container.innerHTML = '<div class="spinner-small"></div> 読み込み中...';
-    
+
     try {
-        const endpoint = targetType === 'database' 
+        const endpoint = targetType === 'database'
             ? `/api/content/database/${targetId}`
             : `/api/content/page/${targetId}`;
-        
+
         const res = await fetch(endpoint);
-        
+
         if (!res.ok) {
             throw new Error('コンテンツの取得に失敗しました');
         }
-        
+
         currentPreviewData = null;
         const data = await res.json();
-        
+
         if (data.type === 'database') {
             currentPreviewData = data;  // タグサジェスト用に保存
             renderDatabaseTable(data, container);
@@ -2228,7 +2417,7 @@ async function fetchAndDisplayContentInModal(targetId, targetType) {
             renderPageBlocks(data.blocks, container);
             container.classList.remove('database-view');
         }
-    } catch(e) {
+    } catch (e) {
         container.innerHTML = '<p class="error">プレビューを取得できませんでした</p>';
     }
 }
@@ -2244,16 +2433,16 @@ async function loadAvailableModels() {
     try {
         const res = await fetch('/api/models');
         if (!res.ok) throw new Error('Failed to load models');
-        
+
         const data = await res.json();
-        
+
         // モデルの分類とデフォルト設定
         availableModels = data.all || [];
         textOnlyModels = data.text_only || [];
         visionModels = data.vision_capable || [];
         defaultTextModel = data.defaults?.text;
         defaultMultimodalModel = data.defaults?.multimodal;
-        
+
         // デフォルトモデルの警告チェック
         if (data.warnings && data.warnings.length > 0) {
             data.warnings.forEach(warning => {
@@ -2262,10 +2451,10 @@ async function loadAvailableModels() {
                 showToast(warning.message);
             });
         }
-        
+
         // ユーザーの前回の選択を復元（なければ自動選択）
         currentModel = localStorage.getItem('memo_ai_selected_model') || null;
-        
+
         // 保存されていたモデルが現在も有効か確認
         if (currentModel) {
             const isValid = availableModels.some(m => m.id === currentModel);
@@ -2276,7 +2465,7 @@ async function loadAvailableModels() {
                 showToast('保存されたモデルが無効なため、自動選択にリセットしました');
             }
         }
-        
+
         console.log("Models loaded:", availableModels.length);
     } catch (err) {
         console.error('Failed to load models:', err);
@@ -2286,10 +2475,10 @@ async function loadAvailableModels() {
 
 function openModelModal() {
     const modal = document.getElementById('modelModal');
-    
+
     // 一時変数に現在の設定をコピー（キャンセル機能のため）
     tempSelectedModel = currentModel;
-    
+
     renderModelList();
     modal.classList.remove('hidden');
 }
@@ -2297,18 +2486,18 @@ function openModelModal() {
 function renderModelList() {
     const modelList = document.getElementById('modelList');
     modelList.innerHTML = '';
-    
+
     // デフォルトモデルの解決
     const textModelInfo = availableModels.find(m => m.id === defaultTextModel);
     const visionModelInfo = availableModels.find(m => m.id === defaultMultimodalModel);
-    
-    const textDisplay = textModelInfo 
+
+    const textDisplay = textModelInfo
         ? `[${textModelInfo.provider}] ${textModelInfo.name}`
         : (defaultTextModel || 'Unknown');
-    const visionDisplay = visionModelInfo 
+    const visionDisplay = visionModelInfo
         ? `[${visionModelInfo.provider}] ${visionModelInfo.name}`
         : (defaultMultimodalModel || 'Unknown');
-    
+
     // デフォルトモデル利用不可の警告
     const textWarning = !textModelInfo ? ' ⚠️' : '';
     const visionWarning = !visionModelInfo ? ' ⚠️' : '';
@@ -2345,37 +2534,37 @@ function renderModelList() {
 function createModelItem(model) {
     const item = document.createElement('div');
     item.className = 'model-item';
-    
+
     const isSelected = model.id === tempSelectedModel;
     if (isSelected) item.classList.add('selected');
-    
+
     // Vision対応アイコン
     const visionIcon = model.supports_vision ? ' 📷' : '';
-    
+
     // [Provider] モデル名 [📷]
     const displayName = `[${model.provider}] ${model.name}${visionIcon}`;
-    
+
     // レートリミット注意書き
-    const rateLimitBadge = model.rate_limit_note 
-        ? `<div class="model-badge warning">⚠️ ${model.rate_limit_note}</div>` 
+    const rateLimitBadge = model.rate_limit_note
+        ? `<div class="model-badge warning">⚠️ ${model.rate_limit_note}</div>`
         : '';
-    
+
     // トークン単価表示（データがある場合のみ）
     let pricingText = '';
     if (model.cost_per_1k_tokens) {
         const inputCost = model.cost_per_1k_tokens.input;
         const outputCost = model.cost_per_1k_tokens.output;
-        
+
         // コストデータがある場合（0でない場合）
         if (inputCost > 0 || outputCost > 0) {
             // 100万トークンあたりの価格に変換（1kトークンの価格 × 1000）
             const inputCostPer1M = (inputCost * 1000).toFixed(2);
             const outputCostPer1M = (outputCost * 1000).toFixed(2);
-            
+
             pricingText = `<span class="model-pricing">$${inputCostPer1M}/$${outputCostPer1M}</span>`;
         }
     }
-        
+
     item.innerHTML = `
         <div class="model-info">
             <div class="model-name">${displayName}${pricingText}</div>
@@ -2383,7 +2572,7 @@ function createModelItem(model) {
         </div>
         <span class="model-check">${isSelected ? '✓' : ''}</span>
     `;
-    
+
     item.onclick = () => selectTempModel(model.id);
     return item;
 }
@@ -2395,14 +2584,14 @@ function selectTempModel(modelId) {
 
 function saveModelSelection() {
     currentModel = tempSelectedModel;
-    
+
     // localStorageに保存
     if (currentModel) {
         localStorage.setItem('memo_ai_selected_model', currentModel);
     } else {
         localStorage.removeItem('memo_ai_selected_model');
     }
-    
+
     showToast('モデル設定を保存しました');
     closeModelModal();
 }
@@ -2429,19 +2618,19 @@ function showState(icon, text, details = null) {
     const stateText = document.getElementById('stateText');
     const stateDetailsContent = document.getElementById('stateDetailsContent');
     const stateDetails = document.getElementById('stateDetails');
-    
+
     stateIcon.textContent = icon;
     stateText.textContent = text;
-    
+
     if (details) {
         stateDetailsContent.textContent = JSON.stringify(details, null, 2);
     } else {
         stateDetailsContent.textContent = "";
     }
-    
+
     stateDisplay.classList.remove('hidden');
     stateDetails.classList.add('hidden'); // デフォルトでは詳細は折りたたむ
-    
+
     // トグルハンドラ
     const toggle = document.getElementById('stateToggle');
     toggle.onclick = (e) => {
@@ -2452,7 +2641,7 @@ function showState(icon, text, details = null) {
 
 function updateState(icon, text, details = null) {
     showState(icon, text, details);
-    
+
     // 成功・完了時は数秒後に自動的に非表示にする
     if (icon === '✅') {
         setTimeout(() => {

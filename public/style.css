@@ -580,11 +580,33 @@ select[multiple].prop-input:hover {
     max-width: 320px;
 }
 
-.emoji-palette-header {
-    font-size: 12px;
-    color: #888;
+/* 絵文字パレットタブ */
+.emoji-palette-tabs {
+    display: flex;
+    border-bottom: 1px solid #e0e0e0;
     margin-bottom: 8px;
-    padding: 0 4px;
+    gap: 4px;
+}
+
+.emoji-tab {
+    flex: 1;
+    padding: 8px 12px;
+    border: none;
+    background: #f5f5f5;
+    border-radius: 8px 8px 0 0;
+    font-size: 12px;
+    color: #666;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s;
+}
+
+.emoji-tab:hover {
+    background: #e8e8e8;
+}
+
+.emoji-tab.active {
+    background: var(--line-green);
+    color: white;
 }
 
 .emoji-grid {
@@ -624,6 +646,90 @@ select[multiple].prop-input:hover {
     padding: 8px;
     background: transparent;
     align-self: flex-end;
+}
+
+/* AIスタンプ（感情表現）- 吹き出し内で大きく表示 */
+.ai-stamp {
+    font-size: 48px;
+    line-height: 1;
+    margin-bottom: 8px;
+    text-align: center;
+}
+
+/* リアクションボタン（吹き出し内） */
+.bubble-react-btn {
+    position: absolute;
+    bottom: -10px;
+    right: 50px;
+    background: #f0f0f0;
+    border: 1px solid #ddd;
+    border-radius: 12px;
+    padding: 4px 8px;
+    font-size: 14px;
+    cursor: pointer;
+    opacity: 0;
+    transition: opacity 0.2s;
+}
+
+.chat-bubble.show-actions .bubble-react-btn {
+    opacity: 1;
+}
+
+.bubble-react-btn:hover {
+    background: #e0e0e0;
+}
+
+/* リアクションピッカー */
+.reaction-picker {
+    position: absolute;
+    bottom: -50px;
+    left: 50%;
+    transform: translateX(-50%);
+    background: white;
+    border-radius: 20px;
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+    padding: 6px 10px;
+    display: flex;
+    gap: 4px;
+    z-index: 100;
+}
+
+.reaction-picker-btn {
+    width: 36px;
+    height: 36px;
+    background: transparent;
+    border: none;
+    font-size: 22px;
+    cursor: pointer;
+    border-radius: 8px;
+    transition: background 0.15s, transform 0.1s;
+}
+
+.reaction-picker-btn:hover {
+    background: #f0f0f0;
+    transform: scale(1.2);
+}
+
+/* メッセージに付いたリアクション表示 */
+.message-reactions {
+    margin-top: 8px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.reaction-item {
+    background: #f5f5f5;
+    border: 1px solid #e0e0e0;
+    border-radius: 12px;
+    padding: 2px 8px;
+    font-size: 14px;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.reaction-item:hover {
+    background: #e5e5e5;
 }
 
 /* チャットコントロール */

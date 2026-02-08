@@ -153,7 +153,10 @@
 
                 <!-- 絵文字パレット -->
                 <div id="emojiPalette" class="emoji-palette hidden">
-                    <div class="emoji-palette-header">よく使う絵文字</div>
+                    <div class="emoji-palette-tabs">
+                        <button type="button" id="emojiTabInsert" class="emoji-tab active" data-mode="insert">入力に挿入</button>
+                        <button type="button" id="emojiTabStamp" class="emoji-tab" data-mode="stamp">🖼️ スタンプ送信</button>
+                    </div>
                     <div class="emoji-grid">
                         <!-- 笑顔・感情 -->
                         <button type="button" class="emoji-btn" data-emoji="😀">😀</button>
